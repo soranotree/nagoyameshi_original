@@ -11,6 +11,7 @@ class CustomUser(AbstractUser):
   # phone_number = models.CharField(max_length=20, null=True, blank=True, verbose_name='電話番号')
   # 有料会員情報
   # account_type = 0
+  username = models.CharField(max_length=150, unique=True, blank=True, null=True)
   account_type = models.IntegerField(verbose_name='アカウント種別', choices=ACCOUNT_TYPE, null=True, blank=True, default=0)
   is_subscribed = models.BooleanField(default=False, verbose_name='有料会員')
   card_number = models.CharField(max_length=128, null=True, blank=True, verbose_name='カード番号')

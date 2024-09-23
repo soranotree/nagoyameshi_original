@@ -1,14 +1,15 @@
 from datetime import date
-
+from django.contrib import messages
 from django.db.models import Avg
 from django.db.models import Q
+from django.db.models import F
 from django.http import JsonResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.views import generic
 
 from . import models
-# from . import forms
+from . import forms
 
 """ トップ画面 ================================== """
 class TopPageView(generic.ListView):
@@ -63,6 +64,72 @@ class TermsView(generic.TemplateView):
 class RestaurantDetailView(generic.DetailView):
   template_name = "restaurant/restaurant_detail.html"
   model = models.Restaurant
+  def get_context_data(self, **kwargs):
+    user = self.request.user
+    pk = self.kwargs['pk']
+    
+    context = super(RestaurantDetailView, self).get_context_data(**kwargs)
+    restaurant = models.Restaurant.objects.filter(id=pk).first()
+    
+    is_favorite = False
+    if user.is_authenticated:
+      is_favorite = models.Favorite.objects.filter(customer=user).filter(restaurant=models.Restaurant.objects.get(pk=pk)).exists()
+    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
+    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
+    average_rate = round(average_rate, 2)
+    if average_rate % 1 == 0:
+      average_rate_star = int(average_rate)
+    else:
+      average_rate_star = round(average_rate * 2) / 2
+      
+    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
+    context.update({
+      'is_favorite': is_favorite,
+      'average_rate': average_rate,
+      'average_rate_star': average_rate_star,
+      'rate_count': rate_count,
+      })
+    return context
+    
+  def post(self, request, **kwargs):
+    user = request.user
+    if not user.is_authenticated:
+      return redirect(reverse_lazy('account_login'))
+      
+    if not user.is_subscribed:
+      return redirect(reverse_lazy('subscribe_register'))
+      
+    pk = kwargs['pk']
+    is_favorite = models.Favorite.objects.filter(customer=user).filter(restaurant=models.Restaurant.objects.get(pk=pk)).exists()
+    if is_favorite:
+      models.Favorite.objects.filter(customer=user).filter(restaurant=models.Restaurant.objects.get(pk=pk)).delete()
+      is_favorite = False
+    else:
+      favorite = models.Favorite()
+      user = request.user
+      favorite.restaurant = models.Restaurant.objects.get(pk=pk)
+      favorite.customer = user
+      favorite.save()
+      is_favorite = True
+      
+    restaurant = models.Restaurant.objects.filter(id=pk).first()
+    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
+    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
+    average_rate = round(average_rate, 2)
+    if average_rate % 1 == 0:
+      average_rate_star = int(average_rate)
+    else:
+      average_rate_star = round(average_rate * 2) / 2
+      
+    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
+    context = {
+      'object': models.Restaurant.objects.get(pk=kwargs['pk']),
+      'is_favorite': is_favorite,
+      'average_rate': average_rate,
+      'average_rate_star': average_rate_star,
+      'rate_count': rate_count,
+      }
+    return render(request, self.template_name, context)
 
 """ レストラン一覧画面 ================================== """
 class RestaurantListView(generic.ListView):
@@ -167,3 +234,196 @@ class RestaurantListView(generic.ListView):
       })
     return context
 
+""" お気に入り一覧画面 ================================== """
+class FavoriteListView(generic.ListView):
+  model = models.Favorite
+  template_name = 'favorite/favorite_list.html'
+  def get_queryset(self):
+    user_id = self.request.user.id
+    queryset = models.Favorite.objects.filter(customer_id=user_id).order_by('-created_at')
+    return queryset
+
+def favorite_delete(request):
+  pk = request.GET.get('pk')
+  is_success = True
+  if pk:
+    try:
+      models.Favorite.objects.filter(id=pk).delete()
+    except:
+      is_success = False
+  else:
+    is_success = False
+  return JsonResponse({'is_success': is_success})
+
+""" 新規予約登録画面 ================================== """
+class ReservationCreateView(generic.CreateView):
+  template_name = "reservation/reservation_create.html"
+  model = models.Reservation
+  fields = []  # フォームは後で動的に生成します
+  # ガイドからの改修によりコメントアウト、フォームなしで実装にトライ
+  # form_class = forms.ReservationCreateForm
+  success_url = reverse_lazy('reservation_list')
+  
+  def get(self, request, **kwargs):
+    user = request.user
+    if user.is_authenticated and user.is_subscribed:
+      return super().get(request, **kwargs)
+    
+    if not user.is_authenticated:
+      return redirect(reverse_lazy('account_login'))
+    
+    if not user.is_subscribed:
+      return redirect(reverse_lazy('subscribe_register'))
+  
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['pk'])
+    context['restaurant'] = restaurant
+    context['hours'] = range(12, 23)
+    # 予約可能なスロットを取得
+    reservation_date = self.request.GET.get('date')  # フロントからの取得
+    reservation_time = self.request.GET.get('time')  # フロントからの取得
+    number_of_people = self.request.GET.get('number_of_people')  # フロントからの取得
+    
+    if reservation_date and reservation_time and number_of_people:
+      self.available_slots = models.Reservation.objects.filter(
+        is_booked = False,
+        restaurant = restaurant,
+        date = reservation_date,
+        time_start= reservation_time,
+        dining_table__min_people__lte=number_of_people,  # 最小人数以上
+        dining_table__max_people__gte=number_of_people  # 最大人数以下
+      )
+      context['available_slots'] = self.available_slots
+      context['reservation_date'] = reservation_date
+      context['reservation_time'] = reservation_time
+      context['number_of_people'] = number_of_people
+    
+    return context
+  
+  def form_valid(self, form):
+    # POSTデータから予約する予約レコードのIDを取得
+    reservation_id = self.request.POST.get('reservation_id')
+    # その予約レコードを取得
+    reservation_to_book = get_object_or_404(models.Reservation, id=reservation_id)
+    # ログインしているユーザーを取得
+    user_instance = self.request.user
+    # 予約レコードの更新
+    reservation_to_book.is_booked = True  # 予約済みにする
+    reservation_to_book.customer = user_instance  # 予約ユーザー
+    reservation_to_book.number_of_people = self.request.POST.get('number_of_people')  # 予約人数
+    reservation_to_book.save()
+    # 予約成功時の処理（必要に応じて追加）
+    messages.success(self.request, "予約が完了しました。")
+    # 予約が成功したらトップページにリダイレクト
+    return redirect(self.success_url)      
+
+  # ガイドからの改修によりコメントアウト
+  #   def form_valid(self, form):
+  #   user_instance = self.request.user
+  #   # GPTのアドバイスにより修正。元の書き方はDB参照ではなくインスタンス生成では？と。
+  #   restaurant_instance = models.Restaurant.objects.get(id=self.kwargs['pk'])
+  #   # restaurant_instance = models.Restaurant(id=self.kwargs['pk'])
+  #   reservation = form.save(commit=False)
+  #   reservation.user = user_instance
+  #   reservation.restaurant = restaurant_instance
+  #   reservation.save()
+  #   return super().form_valid(form)
+    
+  # def form_invalid(self, form):
+  #   return super().form_invalid(form)
+
+    
+  # ガイドからの改修によりコメントアウト、フォームなしで実装にトライ
+  # def get_context_data(self, **kwargs):
+  #   pk = self.kwargs['pk']
+  #   context = super(ReservationCreateView, self).get_context_data(**kwargs)
+  #   restaurant = models.Restaurant.objects.filter(id=pk).first()
+  #   average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
+  #   average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
+  #   average_rate = round(average_rate, 2)
+  #   if average_rate % 1 == 0:
+  #     average_rate_star = int(average_rate)
+  #   else:
+  #     average_rate_star = round(average_rate * 2) / 2
+      
+  #   rate_count = models.Review.objects.filter(restaurant=restaurant).count()
+  #   close_day_list = self.make_close_list(restaurant.close_day_of_week)
+  #   context.update({
+  #     'restaurant': restaurant,
+  #     'close_day_list': close_day_list,
+  #     'average_rate': average_rate,
+  #     'average_rate_star': average_rate_star,
+  #     'rate_count': rate_count,
+  #     })
+  #   return context
+    
+  # def make_close_list(self, close_day):
+  #   close_list = []
+  #   if '月' in close_day:
+  #     close_list.append(1)
+  #   if '火' in close_day:
+  #     close_list.append(2)
+  #   if '水' in close_day:
+  #     close_list.append(3)
+  #   if '木' in close_day:
+  #     close_list.append(4)
+  #   if '金' in close_day:
+  #     close_list.append(5)
+  #   if '土' in close_day:
+  #     close_list.append(6)
+  #   if '日' in close_day:
+  #     close_list.append(0)
+  #   return close_list
+  
+""" 予約一覧表示画面 ================================== """
+class ReservationListView(generic.ListView):
+  model = models.Reservation
+  template_name = 'reservation/reservation_list.html'
+  paginate_by = 5
+  
+  def get_queryset(self):
+    queryset = models.Reservation.objects.filter(
+      customer_id=self.request.user.id,
+      is_booked = True
+      ).order_by('-date')
+    return queryset
+  
+  def get_context_data(self, **kwargs):
+    context = super(ReservationListView, self).get_context_data(**kwargs)
+    context.update({'today': date.today(),})
+    return context
+
+""" 予約の削除 ================================== """
+def reservation_delete(request):
+  pk = request.GET.get('pk')
+  is_success = True
+
+# レコード削除ではなく、is_booked=Falseとcostomer = Noneにするよう変更
+  if pk:
+    try:
+      # 該当する予約レコードを取得
+      reservation = models.Reservation.objects.get(id=pk)
+      # レコードを削除する代わりに、is_booked, customer, number_of_peopleを元に戻す
+      reservation.is_booked = False
+      reservation.customer = None  # customer_idをnullにする
+      reservation.number_of_people = None  # number_of_peopleをnullにする
+      reservation.save()
+    except models.Reservation.DoesNotExist:
+      is_success = False
+    except Exception as e:
+      is_success = False
+  else:
+    is_success = False
+  
+  return JsonResponse({'is_success': is_success})
+
+  
+  # if pk:
+  #   try:
+  #     models.Reservation.objects.filter(id=pk).delete()
+  #   except:
+  #     is_success = False
+  # else:
+  #   is_success = False
+  # return JsonResponse({'is_success': is_success})
