@@ -71,94 +71,105 @@
             </div>
           </form>
 
+<!-- 空き座席のテーブル -->
+
+<h3>空き検索の結果</h3>
+
           <p>予約日：{{ reservation_date }}　予約時間：{{ reservation_time }}　予約人数：{{ number_of_people }}</p>
+          
           {% if available_slots %}
           <p>{{ available_slots.count }}件の空きがあります。</p>
-            <table>
-                <tr>
-                    <th>座席タイプ</th>
-                    <th>　　　</th>
-                    <th>最少<br>人数</th>
-                    <th>　　　</th>
-                    <th>最大<br>人数</th>
-                    <th>　　　</th>
-                    <th>予約</th>
-                </tr>
-                {% for slot in available_slots %}
-                <tr>
-                  <td>{{ slot.dining_table.name_for_customer }}</td>
-                  <td></td>
-                  <td>{{ slot.dining_table.min_people }}名</td>
-                  <td></td>
-                  <td>{{ slot.dining_table.max_people }}名</td>
-                  <td></td>
-                    <td>
-                        <form method="POST" action="{% url 'reservation_create' pk=restaurant.id %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="reservation_id" value="{{ slot.id }}">
-                            <input type="hidden" name="number_of_people" value="{{ number_of_people }}">
-                            <button type="submit">予約する</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
-        {% else %}
-            <p>ご指定の条件では、予約可能なお席が見つかりませんでした。</p>
-        {% endif %}
+          <br>
+          
+          <h3>Step 1. お座席を選択してください</h3>
+          
+          <form method="POST" action="{% url 'reservation_create' pk=restaurant.id %}">
+              {% csrf_token %}
+              
+              <table>
+                  <tr>
+                      <th>座席タイプ</th>
+                      <th>　　　</th>
+                      <th>最少人数</th>
+                      <th>　　　</th>
+                      <th>最大人数</th>
+                      <th>　　　</th>
+                      <th>滞在可能時間</th>
+                      <th>　　　</th>
+                      <th>選択</th>
+                  </tr>
+                  {% for slot in available_slots %}
+                  <tr>
+                      <td>{{ slot.dining_table.name_for_customer }}</td>
+                      <td></td>
+                      <td>{{ slot.dining_table.min_people }}名</td>
+                      <td></td>
+                      <td>{{ slot.dining_table.max_people }}名</td>
+                      <td></td>
+                      <td>{{ slot.duration_min }}分</td>
+                      <td></td>
+                      <td>
+                          <input type="radio" name="reservation_id" value="{{ slot.id }}" id="slot_{{ slot.id }}" {% if forloop.first %}checked{% endif %}>
+                          <label for="slot_{{ slot.id }}">選択</label>
+                      </td>
+                  </tr>
+                  {% endfor %}
+              </table>
+              <br>
+          
+              <!-- メニューのテーブル -->
+              <h3>Step 2. お食事も選択できます（店舗・時間帯によってはお座席のみとなります）</h3>
+              <table>
+                  <tr>
+                      <th>メニュー名</th>
+                      <th>　　　</th>
+                      <th>内容</th>
+                      <th>　　　</th>
+                      <th>価格</th>
+                      <th>　　　</th>
+                      <th>選択</th>
+                  </tr>
+                  <tr>
+                      <td>お座席のみ</td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td></td>
+                      <td>
+                          <input type="radio" name="menu" value="NULL" id="no_menu" checked>
+                          <label for="no_menu">選択</label>
+                      </td>
+                  </tr>
+                  {% for menu in menus %}
+                  <tr>
+                      <td>{{ menu.name }}</td>
+                      <td></td>
+                      <td>{{ menu.description }}</td>
+                      <td></td>
+                      <td>{{ menu.price }}円</td>
+                      <td></td>
+                      <td>
+                          <input type="radio" name="menu" value="{{ menu.id }}" id="menu_{{ menu.id }}">
+                          <label for="menu_{{ menu.id }}">選択</label>
+                      </td>
+                  </tr>
+                  {% endfor %}
+              </table>
+          
+              <!-- 人数の隠しフィールド -->
+              <input type="hidden" name="number_of_people" value="{{ number_of_people }}">
+              <br>
+              <button type="submit">以上の内容で予約する</button>
+          </form>
+          
+      {% else %}
+          <p>ご指定の条件では、予約可能なお席が見つかりませんでした。</p>
+      {% endif %}
 
-          {% comment %} {% if available_slots %}
-          <div>
-            <p>{{ available_slots.count }}件の空きがあります。</p>
-            <ul class="list-group">
-              {% for reservation in available_slots %}
-              <li class="list-group-item">
-                最大{{ reservation.dining_table.max_people }}名様：{{ reservation.dining_table.name_for_customer }}
-                <form method="POST" action="{% url 'reservation_create' reservation.id %}" style="display:inline;">
-                  {% csrf_token %}
-                  <button type="submit" class="btn btn-success btn-sm">予約する</button>
-                </form>
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
-          {% else %}
-          <p>予約できるスロットがありません。</p>
-          {% endif %} {% endcomment %}
 
-        </div>
+    </div>
 
-        {% comment %} オリジナル対応による改修により以下フォーム部分をコメントアウト {% endcomment %}
-        {% comment %} <form method="POST" enctype='multipart/form-data'>
-          {% csrf_token %}
-          <div class="form-group row mb-3">
-            <label for="reservation_date" class="col-md-5 col-form-label text-md-left fw-bold">予約日</label>
-            <div class="col-md-7">
-              {{ form.date }}
-            </div>
-          </div>
-          <div class="form-group row mb-3">
-            <label for="form.time_start" class="col-md-5 col-form-label text-md-left fw-bold">開始時間</label>
-            <div class="col-md-7">
-              {{ form.time_start }}
-            </div>
-          </div>
-          <div class="form-group row mb-3">
-            <label for="form.time_end" class="col-md-5 col-form-label text-md-left fw-bold">終了時間</label>
-            <div class="col-md-7">
-              {{ form.time_end }}
-            </div>
-          </div>
-          <div class="form-group row mb-4">
-            <label for="number_of_people" class="col-md-5 col-form-label text-md-left fw-bold">人数</label>
-            <div class="col-md-7">
-              {{ form.number_of_people }}
-            </div>
-          </div>
-          <div class="form-group d-flex justify-content-center mb-4">
-            <button type="submit" class="btn btn-primary text-white shadow-sm w-50">予約する</button>
-          </div>
-        </form> {% endcomment %}
       </div>
     </div>
   </div>

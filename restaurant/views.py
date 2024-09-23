@@ -293,11 +293,18 @@ class ReservationCreateView(generic.CreateView):
         time_start= reservation_time,
         dining_table__min_people__lte=number_of_people,  # 最小人数以上
         dining_table__max_people__gte=number_of_people  # 最大人数以下
-      )
-      context['available_slots'] = self.available_slots
-      context['reservation_date'] = reservation_date
-      context['reservation_time'] = reservation_time
-      context['number_of_people'] = number_of_people
+        )
+      context['available_slots'] = self.available_slots # コンテキストに追加
+      context['reservation_date'] = reservation_date # コンテキストに追加
+      context['reservation_time'] = reservation_time # コンテキストに追加
+      context['number_of_people'] = number_of_people # コンテキストに追加
+      
+      menus = models.Menu.objects.filter(
+        restaurant = restaurant,
+        available_from__lte=reservation_time, 
+        available_end__gte=reservation_time
+        )
+      context['menus'] = menus # コンテキストに追加
     
     return context
   
@@ -312,6 +319,12 @@ class ReservationCreateView(generic.CreateView):
     reservation_to_book.is_booked = True  # 予約済みにする
     reservation_to_book.customer = user_instance  # 予約ユーザー
     reservation_to_book.number_of_people = self.request.POST.get('number_of_people')  # 予約人数
+    # 予約メニュー
+    menu_id = self.request.POST.get('menu')  # 予約メニュー
+    if menu_id == 'NULL':
+      reservation_to_book.menu = None
+    else:
+      reservation_to_book.menu = models.Menu.objects.get(id=int(menu_id))
     reservation_to_book.save()
     # 予約成功時の処理（必要に応じて追加）
     messages.success(self.request, "予約が完了しました。")
@@ -408,6 +421,7 @@ def reservation_delete(request):
       reservation.is_booked = False
       reservation.customer = None  # customer_idをnullにする
       reservation.number_of_people = None  # number_of_peopleをnullにする
+      reservation.menu = None  # menuをnullにする
       reservation.save()
     except models.Reservation.DoesNotExist:
       is_success = False

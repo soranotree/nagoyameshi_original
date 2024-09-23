@@ -57,11 +57,20 @@ class DiningTable(models.Model):
 
   def __str__(self):
     return self.name_for_internal
+  
+class Menu(models.Model):
+  """メニュー（お食事）モデル"""
+  restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE) # レストランとの紐づけ
+  name = models.CharField(verbose_name='メニュー名', max_length=100) # メニュー名
+  description = models.TextField(verbose_name='メニュー説明') # メニューの説明
+  price = models.IntegerField(verbose_name='価格（一名分）')  # 単価（整数値）
+  available_from = models.TimeField(verbose_name='提供開始時間') # 提供開始時間
+  available_end = models.TimeField(verbose_name='提供終了時間') # 提供終了時間
+  photo = models.ImageField(verbose_name='写真', blank=True, null=True) # メニュー写真
 
 class Reservation(models.Model):
   """予約モデル"""
   TIMES = (
-    # ('', '選択してください'), (datetime.time(12, 0), '12:00'), (datetime.time(13, 0), '13:00'), (datetime.time(14, 0), '14:00'),(datetime.time(15, 0), '15:00'), (datetime.time(18, 0), '18:00'), (datetime.time(19, 0), '19:00'), (datetime.time(20, 0), '20:00'), (datetime.time(21, 0), '21:00'), (datetime.time(22, 0), '22:00'),
     ('', '選択してください'), ('12:00', '12:00'), ('13:00', '13:00'), ('14:00', '14:00'),('15:00', '15:00'), ('18:00', '18:00'), ('19:00', '19:00'), ('20:00', '20:00'), ('21:00', '21:00'), ('22:00', '22:00'),
     )
   NUMBER_OF_PEOPLE = (
@@ -70,15 +79,15 @@ class Reservation(models.Model):
 
   customer = models.ForeignKey(CustomUser, verbose_name='ユーザー会員', on_delete=models.PROTECT, null=True, blank=True)
   restaurant = models.ForeignKey(Restaurant, verbose_name='レストラン', on_delete=models.PROTECT)
-  dining_table = models.ForeignKey(DiningTable, verbose_name='卓情報', on_delete=models.PROTECT)
+  dining_table = models.ForeignKey(DiningTable, verbose_name='卓情報', on_delete=models.PROTECT, null=True, blank=True)
+  menu = models.ForeignKey(Menu, verbose_name='メニュー', on_delete=models.PROTECT, null=True, blank=True)
   date = models.DateField(verbose_name='予約日')
   time_start = models.TimeField(verbose_name='予約開始時間', choices=TIMES, default='')
-  time_end = models.TimeField(verbose_name='予約終了時間', choices=TIMES, default='', null=True, blank=True)
+  duration_min = models.IntegerField(verbose_name='制限時間（分）', null=True, blank=True)  # 制限時間（分、整数値）
   number_of_people = models.IntegerField(verbose_name='人数', choices=NUMBER_OF_PEOPLE, default='', null=True, blank=True)
   is_booked = models.BooleanField(verbose_name='予約済みフラグ', default='0')
   created_at = models.DateTimeField(verbose_name='予約受付日時', auto_now_add=True)
   updated_at = models.DateTimeField(verbose_name='予約更新日時', auto_now=True)
-  
   class Meta:
     verbose_name_plural = 'Reservation'
 
