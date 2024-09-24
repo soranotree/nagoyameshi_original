@@ -40,40 +40,49 @@
         </ul>
 
         {% comment %} ここからオリジナル対応GPT参考 {% endcomment %}
-        <div class="card-header">ご予約条件</div>
+        {% comment %} <div class="card-header">ご予約条件</div> {% endcomment %}
+        <h3>ご予約条件</h3>
         <div class="card-body">
           <form method="GET" class="w-100">
             <div class="form-group row mb-3">
               <label for="date" class="col-md-5 col-form-label text-md-left fw-bold">予約日</label>
               <div class="col-md-7">
-                <input type="date" name="date" id="date" class="form-control" required>
+                <input type="date" name="date" id="date" class="form-control" required
+                {% comment %} value="{% if request.GET.date %}{{ request.GET.date }}{% else %}2024-09-30{% endif %}"> {% endcomment %}
+                value="{% if request.GET.date %}{{ request.GET.date }}{% else %}{{ tomorrow }}{% endif %}">
               </div>
             </div>
             <div class="form-group row mb-3">
               <label for="time" class="col-md-5 col-form-label text-md-left fw-bold">予約時間</label>
               <div class="col-md-7">
                 <select name="time" id="time" class="form-control" required>
-                  <option value="">選択してください</option>
+                  <option value="{{ default_time }}" selected>{{ default_time }}</option>
                   {% for hour in hours %}
-                  <option value="{{ hour }}:00">{{ hour }}:00</option>
-                  <option value="{{ hour }}:30">{{ hour }}:30</option>
+                      <option value="{{ hour }}:00" {% if default_time == hour|stringformat:"02d"|add:":00" %}selected{% endif %}>{{ hour }}:00</option>
+                      <option value="{{ hour }}:30" {% if default_time == hour|stringformat:"02d"|add:":30" %}selected{% endif %}>{{ hour }}:30</option>
                   {% endfor %}
-                </select>
+              </select>
               </div>
             </div>
-            <div class="form-group mb-3">
-              {% comment %} <label for="number_of_people" class="form-label">予約人数</label> {% endcomment %}
+            <div class="form-group row mb-3">
               <label for="number_of_people" class="col-md-5 col-form-label text-md-left fw-bold">予約人数</label>
-              <input type="number" name="number_of_people" class="form-control" required min="1">
+              <div class="col-md-7">
+                <select name="number_of_people" id="number_of_people" class="form-control" required>
+                {% for i in people_range %}
+                <option value="{{ i }}" {% if request.GET.number_of_people == i|stringformat:"s" %}selected{% elif not request.GET.number_of_people and i == 2 %}selected{% endif %}>
+                  {{ i }}人
+                </option>
+                {% endfor %}
+                </select>
+              </div>
             </div>
             <div class="form-group mb-4">
               <button type="submit" class="btn btn-primary">この条件で空きを検索する</button>
             </div>
           </form>
 
-<!-- 空き座席のテーブル -->
-
-<h3>空き検索の結果</h3>
+          <!-- 空き座席のテーブル -->
+          <h3>空き検索の結果</h3>
 
           <p>予約日：{{ reservation_date }}　予約時間：{{ reservation_time }}　予約人数：{{ number_of_people }}</p>
           

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from django.contrib import messages
 from django.db.models import Avg
 from django.db.models import Q
@@ -279,12 +279,14 @@ class ReservationCreateView(generic.CreateView):
     context = super().get_context_data(**kwargs)
     restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['pk'])
     context['restaurant'] = restaurant
-    context['hours'] = range(12, 23)
-    # 予約可能なスロットを取得
+    context['hours'] = range(9, 23) # 予約時間リスト作成
+
+    # 予約条件を取得
     reservation_date = self.request.GET.get('date')  # フロントからの取得
     reservation_time = self.request.GET.get('time')  # フロントからの取得
     number_of_people = self.request.GET.get('number_of_people')  # フロントからの取得
     
+    # 予約可能なスロットを取得
     if reservation_date and reservation_time and number_of_people:
       self.available_slots = models.Reservation.objects.filter(
         is_booked = False,
@@ -299,12 +301,20 @@ class ReservationCreateView(generic.CreateView):
       context['reservation_time'] = reservation_time # コンテキストに追加
       context['number_of_people'] = number_of_people # コンテキストに追加
       
+    # 予約時間帯で提供可能なメニューを取得
       menus = models.Menu.objects.filter(
         restaurant = restaurant,
         available_from__lte=reservation_time, 
         available_end__gte=reservation_time
         )
       context['menus'] = menus # コンテキストに追加
+    
+    # 検索窓のデフォルト値設定＆直前検索データ維持用
+    today = datetime.now().date()
+    tomorrow = today + timedelta(days=1)
+    context['tomorrow'] = tomorrow.strftime('%Y-%m-%d')
+    context['people_range'] = range(1, 13)  # 1人から(n-1)人までのリストを作成
+    context['default_time'] = reservation_time if reservation_time else f"{context['hours'].start}:00"
     
     return context
   
