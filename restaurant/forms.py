@@ -19,15 +19,18 @@ class ReservationCreateForm(forms.ModelForm):
     self.fields['number_of_people'].widget.attrs['class'] = 'form-control'
     self.fields['dining_table'].widget.attrs['class'] = 'form-control'
 
-# class ReviewCreateForm(forms.ModelForm):
-  # class Meta:
-    # model = Review
-    # fields = ('comment', 'rate')
-    # widgets = {'rate': forms.RadioSelect()}
-  # 
-  # def __init__(self, *args, **kwargs):
-    # super().__init__(*args, **kwargs)
-    # self.fields['comment'].widget.attrs['class'] = 'form-control'
-    # self.fields['comment'].widget.attrs['cols'] = '30'
-    # self.fields['comment'].widget.attrs['rows'] = '5'
-    # self.fields['rate'].widget.attrs['class'] = 'form-check-input'
+class ReviewCreateForm(forms.ModelForm):
+  class Meta:
+    model = Review
+    fields = ('visit_date', 'comment', 'rate')
+    widgets = {'rate': forms.RadioSelect()}
+  
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+    self.fields['visit_date'].widget.attrs['id'] = 'visit_date'
+    self.fields['visit_date'].widget.attrs['name'] = 'visit_date'
+    self.fields['comment'].widget.attrs['class'] = 'form-control'
+    self.fields['comment'].widget.attrs['cols'] = '30'
+    self.fields['comment'].widget.attrs['rows'] = '5'
+    self.fields['rate'].widget.attrs['class'] = 'form-check-input'

@@ -12,8 +12,6 @@
         <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'top_page' %}">ホーム</a></li>
-            {% comment %} ガイドは以下「ホーム」のまえの">"がひとつ余分では？と思い削除 {% endcomment %}
-            {% comment %} <li class="breadcrumb-item"><a href="{% url 'top_page' %}">>ホーム</a></li> {% endcomment %}
             <li class="breadcrumb-item"><a href="{% url 'restaurant_list' %}?keyword=&button_type=keyword">店舗一覧</a></li>
             <li class="breadcrumb-item"><a href="{% url 'restaurant_detail' restaurant.id %}">店舗詳細</a></li>
             <li class="breadcrumb-item active" aria-current="page">予約</li>
@@ -33,13 +31,13 @@
           <li class="nav-item">
             <a class="nav-link link-dark"
             {# TODO:1#}
-            {% comment %} href="{% url 'review_list' restaurant.id %}">レビュー</a> {% endcomment %}
-            href="#">レビュー</a>
+            href="{% url 'review_list' restaurant.id %}">レビュー</a>
+            {% comment %} href="#">レビュー</a> {% endcomment %}
             {# href="{% url 'review_list' restaurant.id %}">レビュー</a>#}
           </li>
         </ul>
 
-        {% comment %} ここからオリジナル対応GPT参考 {% endcomment %}
+        {% comment %} ここからオリジナル対応 {% endcomment %}
         {% comment %} <div class="card-header">ご予約条件</div> {% endcomment %}
         <h3>ご予約条件</h3>
         <div class="card-body">
@@ -47,8 +45,7 @@
             <div class="form-group row mb-3">
               <label for="date" class="col-md-5 col-form-label text-md-left fw-bold">予約日</label>
               <div class="col-md-7">
-                <input type="date" name="date" id="date" class="form-control" required
-                {% comment %} value="{% if request.GET.date %}{{ request.GET.date }}{% else %}2024-09-30{% endif %}"> {% endcomment %}
+                <input type="date" name="date" id="date" class="form-control" min="{{ tomorrow }}" required
                 value="{% if request.GET.date %}{{ request.GET.date }}{% else %}{{ tomorrow }}{% endif %}">
               </div>
             </div>
@@ -76,48 +73,47 @@
                 </select>
               </div>
             </div>
-            <div class="form-group mb-4">
-              <button type="submit" class="btn btn-primary">この条件で空きを検索する</button>
+            <div class="form-group mb-4" style="text-align: center;">
+              <button type="submit" class="btn btn-primary">空きを検索する</button>
             </div>
           </form>
 
           <!-- 空き座席のテーブル -->
           <h3>空き検索の結果</h3>
 
-          <p>予約日：{{ reservation_date }}　予約時間：{{ reservation_time }}　予約人数：{{ number_of_people }}</p>
+          <p>予約日：{{ reservation_date }}　時間：{{ reservation_time }}　予約人数：{{ number_of_people }}</p>
           
           {% if available_slots %}
-          <p>{{ available_slots.count }}件の空きがあります。</p>
-          <br>
+          <p>{{ available_slots.count }}席の空きがあります。</p>
           
-          <h3>Step 1. お座席を選択してください</h3>
+          <h3>Step 1. 席を選択してください</h3>
           
           <form method="POST" action="{% url 'reservation_create' pk=restaurant.id %}">
               {% csrf_token %}
               
               <table>
                   <tr>
-                      <th>座席タイプ</th>
+                      <th style="text-align: center;">座席タイプ</th>
                       <th>　　　</th>
-                      <th>最少人数</th>
-                      <th>　　　</th>
-                      <th>最大人数</th>
-                      <th>　　　</th>
-                      <th>滞在可能時間</th>
-                      <th>　　　</th>
-                      <th>選択</th>
+                      <th style="text-align: center;">最少人数</th>
+                      <th style="text-align: center;">　　　</th>
+                      <th style="text-align: center;">最大人数</th>
+                      <th style="text-align: center;">　　　</th>
+                      <th style="text-align: center;">滞在可能時間</th>
+                      <th style="text-align: center;">　　　</th>
+                      <th style="text-align: center;">選択</th>
                   </tr>
                   {% for slot in available_slots %}
                   <tr>
                       <td>{{ slot.dining_table.name_for_customer }}</td>
                       <td></td>
-                      <td>{{ slot.dining_table.min_people }}名</td>
+                      <th style="text-align: center; font-weight: normal;">{{ slot.dining_table.min_people }}名</td>
                       <td></td>
-                      <td>{{ slot.dining_table.max_people }}名</td>
+                      <th style="text-align: center; font-weight: normal;">{{ slot.dining_table.max_people }}名</td>
                       <td></td>
-                      <td>{{ slot.duration_min }}分</td>
+                      <th style="text-align: center; font-weight: normal;">{{ slot.duration_min }}分</td>
                       <td></td>
-                      <td>
+                      <th style="text-align: center; font-weight: normal;">
                           <input type="radio" name="reservation_id" value="{{ slot.id }}" id="slot_{{ slot.id }}" {% if forloop.first %}checked{% endif %}>
                           <label for="slot_{{ slot.id }}">選択</label>
                       </td>
@@ -127,25 +123,25 @@
               <br>
           
               <!-- メニューのテーブル -->
-              <h3>Step 2. お食事も選択できます（店舗・時間帯によってはお座席のみとなります）</h3>
+              <h3>Step 2. お食事も選択できます（店舗・時間帯によっては席のみとなります）</h3>
               <table>
                   <tr>
-                      <th>メニュー名</th>
+                    <th style="text-align: center;">メニュー名</th>
                       <th>　　　</th>
-                      <th>内容</th>
+                      <th style="text-align: center;">内容</th>
                       <th>　　　</th>
-                      <th>価格</th>
+                      <th style="text-align: center;">価格</th>
                       <th>　　　</th>
-                      <th>選択</th>
+                      <th style="text-align: center;">選択</th>
                   </tr>
                   <tr>
-                      <td>お座席のみ</td>
+                      <td>席のみ</td>
                       <td></td>
                       <td></td>
                       <td></td>
+                      <th style="text-align: center;">－</td>
                       <td></td>
-                      <td></td>
-                      <td>
+                      <th style="text-align: center; font-weight: normal;">
                           <input type="radio" name="menu" value="NULL" id="no_menu" checked>
                           <label for="no_menu">選択</label>
                       </td>
@@ -156,9 +152,9 @@
                       <td></td>
                       <td>{{ menu.description }}</td>
                       <td></td>
-                      <td>{{ menu.price }}円</td>
+                      <th style="text-align: center; font-weight: normal;">{{ menu.price }}円</td>
                       <td></td>
-                      <td>
+                      <th style="text-align: center; font-weight: normal;">
                           <input type="radio" name="menu" value="{{ menu.id }}" id="menu_{{ menu.id }}">
                           <label for="menu_{{ menu.id }}">選択</label>
                       </td>
@@ -173,7 +169,7 @@
           </form>
           
       {% else %}
-          <p>ご指定の条件では、予約可能なお席が見つかりませんでした。</p>
+          <p>予約可能な席はありません。</p>
       {% endif %}
 
 

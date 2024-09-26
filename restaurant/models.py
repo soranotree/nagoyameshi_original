@@ -103,33 +103,16 @@ class Review(models.Model):
   visit_date = models.DateField(verbose_name='訪問日')
   comment = models.TextField(verbose_name='コメント', blank=True, null=True)
   rate = models.IntegerField(verbose_name='レート', default=5, choices=RATES)
-  # reply = models.TextField(verbose_name='回答', blank=True, null=True)
   display_masked = models.BooleanField(verbose_name='非表示フラグ', default='0')
-  comment_created_at = models.DateTimeField(verbose_name='レビュー作成日時', auto_now_add=True)
-  comment_updated_at = models.DateTimeField(verbose_name='レビュー更新日時', auto_now=True)
-  # reply_created_at = models.DateTimeField(verbose_name='回答作成日時', auto_now_add=True)
-  # reply_updated_at = models.DateTimeField(verbose_name='回答更新日時', auto_now=True)
+  reply = models.TextField(verbose_name='返信', blank=True, null=True)
+  created_at = models.DateTimeField(verbose_name='レビュー作成日時', auto_now_add=True)
+  updated_at = models.DateTimeField(verbose_name='レビュー更新日時', auto_now=True)
   
   class Meta:
     verbose_name_plural = 'Review'
 
   def __str__(self):
     return self.restaurant.shop_name
-
-class ReviewReply(models.Model):
-  """レビュー回答モデル"""
-  review = models.ForeignKey(Review, verbose_name='レビュー', on_delete=models.PROTECT)
-  reply = models.TextField(verbose_name='回答', blank=True, null=True)
-  display_masked = models.BooleanField(verbose_name='非表示フラグ', default='0')
-  comment_created_at = models.DateTimeField(verbose_name='回答作成日時', auto_now_add=True)
-  comment_updated_at = models.DateTimeField(verbose_name='回答更新日時', auto_now=True)
-  
-  class Meta:
-    verbose_name_plural = 'Review Reply'
-
-  def __str__(self):
-    return self.review.restaurant.shop_name
-
 
 class Favorite(models.Model):
   """お気に入りモデル"""
