@@ -39,10 +39,15 @@ class TopPageView(generic.ListView):
       average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
       average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
       average_rate_list.append(round(average_rate, 2))
+      # if average_rate % 1 == 0:
+      #   average_rate = int(average_rate)
+      # else:
+      #   average_rate = round(average_rate * 2) / 2
+
+      average_rate = round(average_rate * 2) / 2
       if average_rate % 1 == 0:
         average_rate = int(average_rate)
-      else:
-        average_rate = round(average_rate * 2) / 2
+
       average_rate_star_list.append(average_rate)
 
     context.update({
@@ -77,10 +82,14 @@ class RestaurantDetailView(generic.DetailView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
       
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context.update({
@@ -116,10 +125,15 @@ class RestaurantDetailView(generic.DetailView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+ 
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
+ 
       
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context = {
@@ -179,6 +193,7 @@ class RestaurantListView(generic.ListView):
     restaurant_list = models.Restaurant.objects.filter(
       Q(shop_name__icontains=keyword_session) | Q(address__icontains=keyword_session) | Q(category__name__icontains=keyword_session))
     restaurant_list = restaurant_list.filter(category__name__icontains=category_session)
+    # print(f'restaurant_list_count: { restaurant_list.count() }')
 
     if int(price_session) > 0:
       restaurant_data = models.Restaurant.objects.values('id', 'price')
@@ -192,10 +207,14 @@ class RestaurantListView(generic.ListView):
         
         if int(price_list[0]) <= int(price_session) <= int(price_list[1]):
           target_id_list.append(data['id'])
-          restaurant_list = restaurant_list.filter(id__in=target_id_list)
+          # print(f"Restaurant: {data['id']}, Price: {data['price']}")
+          # print(f"price_session: { price_session }")
+      restaurant_list = restaurant_list.filter(id__in=target_id_list)
+      # print(f'restaurant_list: { restaurant_list.count() }')
             
     # 表示順
     restaurant_list = restaurant_list.order_by(select_sort_session)
+    # print(f'restaurant_list_count: { restaurant_list.count() }')
     
     category_list = models.Category.objects.all()
     
@@ -206,14 +225,25 @@ class RestaurantListView(generic.ListView):
     
     for restaurant in restaurant_list:
       average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
+      # print(f'avaratge_rate: { average_rate }')
       average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
+      # print(f'avaratge_rate: { average_rate }')
       average_rate_list.append(round(average_rate, 2))
+      # print(f'avaratge_rate_list: { len(average_rate_list) }')
       
+      # rate_starに持っていく際に、整数になるケースは最後にintで整数にしなければならない
+      # そもそも一発目で整数になるケースは超レア⇒最後に整数処理するように修正
+      # if average_rate % 1 == 0:
+      #   average_rate = int(average_rate)
+      # else:
+      #   average_rate = round(average_rate * 2) / 2
+      average_rate = round(average_rate * 2) / 2
       if average_rate % 1 == 0:
         average_rate = int(average_rate)
-      else:
-        average_rate = round(average_rate * 2) / 2
+
+      
       average_rate_star_list.append(average_rate)
+      # print(f'avaratge_rate_star_list: { len(average_rate_star_list) }' )
       
       rate_num = models.Review.objects.filter(restaurant=restaurant).count()
       rate_num_list.append(rate_num)
@@ -285,10 +315,15 @@ class ReservationCreateView(generic.CreateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
+
       
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context['average_rate'] = average_rate # コンテキストに追加
@@ -488,10 +523,18 @@ class ReviewListView(generic.ListView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
+
+
+
+
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
 
     context.update({
@@ -540,10 +583,15 @@ class ReviewCreateView(generic.CreateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
+
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context.update({
       'restaurant': restaurant,
@@ -578,10 +626,15 @@ class ReviewUpdateView(generic.UpdateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
-    if average_rate % 1 == 0:
+    # if average_rate % 1 == 0:
+    #   average_rate_star = int(average_rate)
+    # else:
+    #   average_rate_star = round(average_rate * 2) / 2
+
+    average_rate_star = round(average_rate * 2) / 2
+    if average_rate_star % 1 == 0:
       average_rate_star = int(average_rate)
-    else:
-      average_rate_star = round(average_rate * 2) / 2
+
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context.update({
       'restaurant': restaurant,

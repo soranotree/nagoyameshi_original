@@ -54,20 +54,23 @@
                   <option value="2000" {% if price_session == "2000" %}selected{% endif %}>2,000円</option>
                   <option value="2500" {% if price_session == "2500" %}selected{% endif %}>2,500円</option>
                   <option value="3000" {% if price_session == "3000" %}selected{% endif %}>3,000円</option>
-                  <option value="3500" {% if price_session == "3500" %}selected{% endif %}>3,500円</option>
                   <option value="4000" {% if price_session == "4000" %}selected{% endif %}>4,000円</option>
-                  <option value="4500" {% if price_session == "4500" %}selected{% endif %}>4,500円</option>
                   <option value="5000" {% if price_session == "5000" %}selected{% endif %}>5,000円</option>
-                  <option value="5500" {% if price_session == "5500" %}selected{% endif %}>5,500円</option>
                   <option value="6000" {% if price_session == "6000" %}selected{% endif %}>6,000円</option>
-                  <option value="6500" {% if price_session == "6500" %}selected{% endif %}>6,500円</option>
                   <option value="7000" {% if price_session == "7000" %}selected{% endif %}>7,000円</option>
-                  <option value="7500" {% if price_session == "7500" %}selected{% endif %}>7,500円</option>
                   <option value="8000" {% if price_session == "8000" %}selected{% endif %}>8,000円</option>
-                  <option value="8500" {% if price_session == "8500" %}selected{% endif %}>8,500円</option>
                   <option value="9000" {% if price_session == "9000" %}selected{% endif %}>9,000円</option>
-                  <option value="9500" {% if price_session == "9500" %}selected{% endif %}>9,500円</option>
                   <option value="10000" {% if price_session == "10000" %}selected{% endif %}>10,000円</option>
+                  <option value="11000" {% if price_session == "11000" %}selected{% endif %}>11,000円</option>
+                  <option value="12000" {% if price_session == "12000" %}selected{% endif %}>12,000円</option>
+                  <option value="13000" {% if price_session == "13000" %}selected{% endif %}>13,000円</option>
+                  <option value="14000" {% if price_session == "14000" %}selected{% endif %}>14,000円</option>
+                  <option value="15000" {% if price_session == "15000" %}selected{% endif %}>15,000円</option>
+                  <option value="16000" {% if price_session == "16000" %}selected{% endif %}>16,000円</option>
+                  <option value="17000" {% if price_session == "17000" %}selected{% endif %}>17,000円</option>
+                  <option value="18000" {% if price_session == "18000" %}selected{% endif %}>18,000円</option>
+                  <option value="19000" {% if price_session == "19000" %}selected{% endif %}>19,000円</option>
+                  <option value="20000" {% if price_session == "20000" %}selected{% endif %}>20,000円</option>
                 </select>
               </div>
               <input type="hidden" name="button_type" value="price">
@@ -80,7 +83,7 @@
       </div>
       <div class="col">
         <div class="d-flex justify-content-between flex-wrap">
-{% comment %} view.pyに記載の通り対応済み。ガイドではrestaurant_list.countだが表示不可のため以下ｍに修正 {% endcomment %}
+{% comment %} view.pyに記載の通り対応済み。ガイドではrestaurant_list.countだが表示不可のため以下に修正 {% endcomment %}
           <p class="fs-5 mb-3">{{ restaurant_list_count }}件の店舗が見つかりました<span class="fs-6"> </span></p>
           <form method="GET" class="mb-3 sort-box">
             <select class="form-select form-select-sm" name="select_sort" aria-label=".form-select-sm example" onChange="this.form.submit();">
@@ -107,14 +110,15 @@
                   <div class="card-body">
                     <h3 class="card-title">{{ restaurant.shop_name }}</h3>
                     <div class="col d-flex text-secondary">
-                      <div>{{ restaurant.category }}
-                      </div>
+                      <div>{{ restaurant.category }}<br></div>
                     </div>
+                    <p class="mb-1">
+                      住所：{{ restaurant.zip_code }} {{ restaurant.address }} <br>
+                      電話：{{ restaurant.phone }}</p>
                     <hr class="my-2">
                     <p class="mb-1">
                       <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>
-                      {{ rate }} 
-                      （{{ rate_num }}件）
+                      {{ rate }}（{{ rate_num }}件）
                     </p>
                     <div class="mb-1">
                       <span>{{ restaurant.price }}</span>

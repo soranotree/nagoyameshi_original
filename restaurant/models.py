@@ -20,6 +20,7 @@ class Restaurant(models.Model):
   """レストランモデル"""
   shop_owner = models.ForeignKey(CustomUser, verbose_name='店舗オーナー', on_delete=models.PROTECT, null=True, blank=True)
   category = models.ForeignKey(Category, verbose_name='カテゴリー', on_delete=models.PROTECT)
+  # rateはreviewで持たせている。restaurantでは不要
   rate = models.FloatField(verbose_name='レート', default=0.0)
   zip_code = models.CharField(verbose_name='郵便番号', max_length=32)
   shop_name = models.CharField(verbose_name='店舗名', max_length=64)
@@ -28,6 +29,7 @@ class Restaurant(models.Model):
   owner_name = models.CharField(verbose_name='代表者名', max_length=64)
   email = models.CharField(max_length=128, null=True, blank=True, verbose_name='メールアドレス')
   description = models.CharField(verbose_name='説明', max_length=128)
+  price = models.CharField(verbose_name='価格帯', max_length=32)
   photo = models.ImageField(verbose_name='写真', blank=True, null=True)
   business_time = models.CharField(verbose_name='営業時間', max_length=64, null=True, blank=True)
   close_day_of_week = models.CharField(verbose_name='定休日', max_length=32, null=True, blank=True)
