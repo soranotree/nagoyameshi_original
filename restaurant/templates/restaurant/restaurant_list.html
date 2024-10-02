@@ -2,6 +2,7 @@
 {% load static %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block content %}
+{% comment %} {% load humanize %} {% endcomment %}
 <main>
 
   <div class="container nagoyameshi-container pb-5">
@@ -118,12 +119,15 @@
                     <hr class="my-2">
                     <p class="mb-1">
                       <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>
-                      {{ rate }}（{{ rate_num }}件）
+                      {{ rate|floatformat:2 }}（{{ rate_num }}件）
                     </p>
                     <div class="mb-1">
-                      <span>{{ restaurant.price }}</span>
+                      <span>{{ restaurant.min_price }}円～{{ restaurant.max_price }}円</span>
+                      {% comment %} <span>{{ restaurant.min_price|floatformat:0|intcomma }}円～{{ restaurant.max_price|floatformat:0|intcomma }}円</span> {% endcomment %}
                     </div>
                     <p class="card-text">{{ restaurant.description }}</p>
+                    <p class="card-text">★テスト用：掲載日{{ restaurant.created_at }}</p>
+                    <p class="card-text">★テスト用：予約数{{ restaurant.reservation_num }}</p>
                   </div>
                 </div>
               </div>

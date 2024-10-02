@@ -8,22 +8,25 @@ class Command(BaseCommand):
         restaurants = Restaurant.objects.all()
 
         for restaurant in restaurants:
-            # Query the Menu model for the restaurant to find min and max prices
+            # Query the Menu model for the restaurant and aggregate min/max price
             menus = Menu.objects.filter(restaurant=restaurant)
             
             if menus.exists():
-                min_price = menus.order_by('price').first().price
-                max_price = menus.order_by('-price').first().price
+                prices = menus.values_list('price', flat=True)
+                min_price = min(prices)
+                max_price = max(prices)
 
-                # Format the price with commas for thousands
-                formatted_min_price = f"{min_price:,}"
-                formatted_max_price = f"{max_price:,}"
-
-                # Update the price field as "min_price円～max_price円"
-                restaurant.price = f"{formatted_min_price}円～{formatted_max_price}円"
+                # Update the restaurant with the new price range
+                restaurant.min_price = min_price
+                restaurant.max_price = max_price
 
                 # Save the updated restaurant object
                 restaurant.save()
-                self.stdout.write(self.style.SUCCESS(f"Updated {restaurant.shop_name} with price range {restaurant.price}."))
+
+                self.stdout.write(self.style.SUCCESS(
+                    f"Updated {restaurant.shop_name} with price range {min_price:,}円 to {max_price:,}円."
+                ))
             else:
-                self.stdout.write(self.style.WARNING(f"No menus found for {restaurant.shop_name}, skipping."))
+                self.stdout.write(self.style.WARNING(
+                    f"No menus found for {restaurant.shop_name}, skipping."
+                ))

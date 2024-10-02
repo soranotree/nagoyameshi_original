@@ -10,14 +10,12 @@
           <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'top_page' %}">ホーム</a></li>
             <li class="breadcrumb-item"><a href="{% url 'restaurant_list' %}?keyword=&button_type=keyword">店舗一覧</a></li>
-            {% comment %} 以下</li>がないため追加した {% endcomment %}
-            {% comment %} <li class="breadcrumb-item"><a href="{% url 'restaurant_list' %}?keyword=&button_type=keyword">店舗一覧</a> {% endcomment %}
             <li class="breadcrumb-item"><a href="{% url 'restaurant_detail' restaurant.id %}">店舗詳細</a></li>
             <li class="breadcrumb-item"><a href="{% url 'review_list' restaurant.id %}">レビュー</a></li>
-            <li class="breadcrumb-item active" aria-current="page">レビュー投稿</li>
+            <li class="breadcrumb-item active" aria-current="page">レビュー更新</li>
           </ol>
         </nav>
-        <h1 class="mb-2 text-center">{{ restaurant.name }}</h1>
+        <h1 class="mb-2 text-center">{{ restaurant.shop_name }}</h1>
         <p class="text-center"><span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>{{ average_rate }} （{{ rate_count }}件）</p>
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">
@@ -32,7 +30,42 @@
         </ul>
         <form method="post" enctype='multipart/form-data'>
           {% csrf_token %}
-          <div class="mb-3">
+
+          <div class="form-group row mb-3">
+            <label for="visit_date" class="col-md-5 col-form-label text-md-left fw-bold">訪問日</label>
+            <div class="col-md-7">
+              {% comment %} {{ form.visit_date }} {% endcomment %}
+              <input type="date" name="visit_date" id="visit_date" class="form-control" value="{{ form.instance.visit_date|date:'Y-m-d' }}" required>
+            </div>
+          </div>
+
+          {% comment %} 右寄せ {% endcomment %}
+          <div class="mb-3 row">
+            <label class="col-form-label col-md-2 text-md-left fw-bold">評価</label>
+            <div class="col-md-10 d-flex justify-content-end">
+              {% for form_rate in form.rate %}
+              <div class="form-check form-check-inline">
+                {{ form_rate }}
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          
+
+          {% comment %} 同じ行だけど右寄せせず {% endcomment %}
+          {% comment %} <div class="mb-3 row">
+            <label class="col-form-label col-md-2 text-md-left fw-bold">評価</label>
+            <div class="col-md-10">
+              {% for form_rate in form.rate %}
+              <div class="form-check form-check-inline">
+                {{ form_rate }}
+              </div>
+              {% endfor %}
+            </div>
+          </div> {% endcomment %}
+          
+          {% comment %} 次の行 {% endcomment %}
+          {% comment %} <div class="mb-3">
             <label class="form-label text-md-left fw-bold">評価
             </label>
             <div>
@@ -42,8 +75,20 @@
               </div>
               {% endfor %}
             </div>
+          </div> {% endcomment %}
+
+          {% comment %} 右寄せ {% endcomment %}
+          <div class="mb-4 row">
+            <label for="content" class="col-form-label col-md-2 text-md-left fw-bold">感想</label>
+            <div class="col-md-10">
+              {{ form.comment }}
+            </div>
           </div>
-          <div class="mb-4">
+          <div class="form-group d-flex justify-content-center mb-4">
+            <button type="submit" class="btn btn-primary text-white shadow-sm w-50">更新</button>
+          </div>
+          
+          {% comment %} <div class="mb-4">
             <label for="content" class="form-label text-md-left fw-bold">感想</label>
             <div>
               {{ form.comment }}
@@ -51,7 +96,8 @@
           </div>
           <div class="form-group d-flex justify-content-center mb-4">
             <button type="submit" class="btn btn-primary text-white shadow-sm w-50">更新</button>
-          </div>
+          </div> {% endcomment %}
+
         </form>
       </div>
     </div>

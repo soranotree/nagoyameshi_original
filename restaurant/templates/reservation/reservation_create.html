@@ -19,7 +19,7 @@
         </nav>
         <h1 class="mb-2 text-center">{{ restaurant.shop_name }}</h1>
         <p class="text-center"><span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>
-          {{ average_rate }} （{{ rate_count }}件）
+          {{ average_rate|floatformat:2 }} （{{ rate_count }}件）
         </p>
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">
@@ -161,12 +161,18 @@
                   </tr>
                   {% endfor %}
               </table>
-          
+
+
+              <div class="form-group mb-4" style="text-align: center;">
+              {% comment %} <div class="form-group d-flex justify-content-center mb-4"> {% endcomment %}
               <!-- 人数の隠しフィールド -->
-              <input type="hidden" name="number_of_people" value="{{ number_of_people }}">
-              <br>
-              <button type="submit">以上の内容で予約する</button>
-          </form>
+                <input type="hidden" name="number_of_people" value="{{ number_of_people }}">
+                <br>
+                <button type="submit" class="btn btn-primary text-white shadow-sm">上記の内容で予約する</button>
+                {% comment %} <button type="submit">以上の内容で予約する</button> {% endcomment %}
+              </div>
+
+            </form>
           
       {% else %}
           <p>予約可能な席はありません。</p>

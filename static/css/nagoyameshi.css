@@ -170,7 +170,7 @@ a {
   width: 70%;
 }
 
-.star-rating[data-rate=3]:after {
+.star-rating[data-rate="3"]:after {
   width: 60%;
 }
 

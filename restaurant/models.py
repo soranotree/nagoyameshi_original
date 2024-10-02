@@ -20,8 +20,6 @@ class Restaurant(models.Model):
   """レストランモデル"""
   shop_owner = models.ForeignKey(CustomUser, verbose_name='店舗オーナー', on_delete=models.PROTECT, null=True, blank=True)
   category = models.ForeignKey(Category, verbose_name='カテゴリー', on_delete=models.PROTECT)
-  # rateはreviewで持たせている。restaurantでは不要
-  rate = models.FloatField(verbose_name='レート', default=0.0)
   zip_code = models.CharField(verbose_name='郵便番号', max_length=32)
   shop_name = models.CharField(verbose_name='店舗名', max_length=64)
   address = models.CharField(verbose_name='住所', max_length=128)
@@ -29,10 +27,15 @@ class Restaurant(models.Model):
   owner_name = models.CharField(verbose_name='代表者名', max_length=64)
   email = models.CharField(max_length=128, null=True, blank=True, verbose_name='メールアドレス')
   description = models.CharField(verbose_name='説明', max_length=128)
+  min_price = models.IntegerField(verbose_name='最低価格', null=True, blank=True)
+  max_price = models.IntegerField(verbose_name='最高価格', null=True, blank=True)
   price = models.CharField(verbose_name='価格帯', max_length=32)
   photo = models.ImageField(verbose_name='写真', blank=True, null=True)
   business_time = models.CharField(verbose_name='営業時間', max_length=64, null=True, blank=True)
   close_day_of_week = models.CharField(verbose_name='定休日', max_length=32, null=True, blank=True)
+  rate = models.FloatField(verbose_name='レート', default=0.0)
+  review_num = models.IntegerField(verbose_name='レビュー数', default=0)
+  reservation_num = models.IntegerField(verbose_name='予約数', default=0)
   created_at = models.DateTimeField(verbose_name='作成日時', auto_now_add=True)
   updated_at = models.DateTimeField(verbose_name='更新日時', auto_now=True)
   
@@ -88,6 +91,7 @@ class Reservation(models.Model):
   duration_min = models.IntegerField(verbose_name='制限時間（分）', null=True, blank=True)  # 制限時間（分、整数値）
   number_of_people = models.IntegerField(verbose_name='人数', choices=NUMBER_OF_PEOPLE, default='', null=True, blank=True)
   is_booked = models.BooleanField(verbose_name='予約済みフラグ', default='0')
+  is_dependent = models.BooleanField(verbose_name='枠依存用予約フラグ', default='0')
   created_at = models.DateTimeField(verbose_name='予約受付日時', auto_now_add=True)
   updated_at = models.DateTimeField(verbose_name='予約更新日時', auto_now=True)
   class Meta:

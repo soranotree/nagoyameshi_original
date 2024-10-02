@@ -21,7 +21,7 @@
         <!-- 星評価のアイコンは0.5刻みにし、数値は小数点第3位以下を四捨五入する（小数点第2位まで表示する）-->
         <p class="text-center">
           <span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>
-          {{ average_rate }} （{{ rate_count }}件）
+          {{ average_rate|floatformat:2 }} （{{ rate_count }}件）
         </p>
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">

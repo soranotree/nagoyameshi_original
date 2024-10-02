@@ -2,6 +2,7 @@
 {% load static %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block content %}
+{% load humanize %}
 <main>
   <div class="container nagoyameshi-container pb-5">
     <div class="row justify-content-center">
@@ -21,7 +22,7 @@
         <h1 class="mb-2 text-center">{{ object.shop_name }}</h1>
         <p class="text-center">
           <span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>
-          {{ average_rate }} （{{ rate_count }}件）
+          {{ average_rate|floatformat:2 }} （{{ rate_count }}件）
         </p>
         <ul class="nav nav-tabs mb-2">
           <li class="nav-item">
@@ -69,7 +70,7 @@
               <span class="fw-bold">価格帯</span>
             </div>
             <div class="col">
-              <span>{{ object.price }}</span>
+              <span>{{ restaurant.min_price|floatformat:0|intcomma }}円～{{ restaurant.max_price|floatformat:0|intcomma }}円</span>
             </div>
           </div>
           <div class="row pb-2 mb-2 border-bottom">
@@ -111,7 +112,7 @@
               <span class="fw-bold">座席数</span>
             </div>
             <div class="col">
-              <span>{{ object.seats_number }}</span>
+              <span>{{ total_seats }}席</span>
             </div>
           </div>
           <div class="row pb-2 mb-4 border-bottom">

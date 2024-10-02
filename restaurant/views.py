@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 from django.contrib import messages
-from django.db.models import Avg
+from django.db.models import Avg, Sum
 from django.db.models import Q
 from django.db.models import F
 from django.http import JsonResponse
@@ -92,11 +92,16 @@ class RestaurantDetailView(generic.DetailView):
       average_rate_star = int(average_rate)
       
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
+    
+    total_seats = models.DiningTable.objects.filter(restaurant=restaurant).aggregate(total=Sum('max_people'))['total'] or 0
+    
+    
     context.update({
       'is_favorite': is_favorite,
       'average_rate': average_rate,
       'average_rate_star': average_rate_star,
       'rate_count': rate_count,
+      'total_seats': total_seats,
       })
     return context
     
@@ -188,33 +193,55 @@ class RestaurantListView(generic.ListView):
     category_session = self.request.session.get('category_session')
     price_session = self.request.session.get('price_session')
     select_sort_session = self.request.session.get('select_sort')
-      
+    print(f'select sort session: { select_sort_session }')
+
     # filtering queryset
     restaurant_list = models.Restaurant.objects.filter(
       Q(shop_name__icontains=keyword_session) | Q(address__icontains=keyword_session) | Q(category__name__icontains=keyword_session))
     restaurant_list = restaurant_list.filter(category__name__icontains=category_session)
     # print(f'restaurant_list_count: { restaurant_list.count() }')
-
+    # 予算から探す場合
     if int(price_session) > 0:
-      restaurant_data = models.Restaurant.objects.values('id', 'price')
-      target_id_list = []
+      restaurant_list = restaurant_list.filter(min_price__lte=price_session, max_price__gte=price_session)
+
+    # DB Update before filtering/ sorting
+    for restaurant in restaurant_list:
+      # Restaurantのrateはレビュー登録・編集・削除時に実施するようにしたので不要になった
+      # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+      # if average_rate is not None:
+      #   average_rate = round(average_rate, 2)
+      #   restaurant.rate = average_rate
+      # else:
+      #   restaurant.rate = None
       
-      for data in restaurant_data:
-        price_str = data['price']
-        price_str = price_str.replace('円', '')
-        price_str = price_str.replace(',', '')
-        price_list = price_str.split('～')
-        
-        if int(price_list[0]) <= int(price_session) <= int(price_list[1]):
-          target_id_list.append(data['id'])
-          # print(f"Restaurant: {data['id']}, Price: {data['price']}")
-          # print(f"price_session: { price_session }")
-      restaurant_list = restaurant_list.filter(id__in=target_id_list)
-      # print(f'restaurant_list: { restaurant_list.count() }')
-            
-    # 表示順
-    restaurant_list = restaurant_list.order_by(select_sort_session)
-    # print(f'restaurant_list_count: { restaurant_list.count() }')
+      # 今後これもメニュー登録＆変更時にするようにしたい
+      menus = models.Menu.objects.filter(restaurant=restaurant)
+      if menus.exists():
+        prices = menus.values_list('price', flat=True)
+        restaurant.min_price = min(prices)
+        restaurant.max_price = max(prices)
+      else:
+        restaurant.min_price = None
+        restaurant.max_price = None
+
+      restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
+
+      today = date.today()
+      restaurant.reservation_num = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False, date__gte=today).count()
+
+      restaurant.save()
+    
+    print(f'price session: { price_session }')    # 表示順
+    if select_sort_session == 'price':
+    # if int(price_session) > 0:
+      restaurant_list = restaurant_list.order_by('min_price')
+      print(f'価格でソート')
+      # print(restaurant_list.query)
+    else:
+      restaurant_list = restaurant_list.order_by(select_sort_session)
+      print(f'{ select_sort_session }でソート')
+
+    # print(f'restaurant_list: { restaurant_list }')
     
     category_list = models.Category.objects.all()
     
@@ -224,10 +251,12 @@ class RestaurantListView(generic.ListView):
     rate_num_list = []
     
     for restaurant in restaurant_list:
-      average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
+      # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
       # print(f'avaratge_rate: { average_rate }')
-      average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
+      # average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
       # print(f'avaratge_rate: { average_rate }')
+      # average_rate_list.append(round(average_rate, 2))
+      average_rate = restaurant.rate
       average_rate_list.append(round(average_rate, 2))
       # print(f'avaratge_rate_list: { len(average_rate_list) }')
       
@@ -569,6 +598,18 @@ class ReviewCreateView(generic.CreateView):
     review.restaurant = restaurant_instance
     review.customer = user_instance
     review.save()
+
+    # Update the restaurant's rate field
+    restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
+    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+    if average_rate is not None:
+        average_rate = round(average_rate, 2)
+        restaurant.rate = average_rate
+    else:
+        restaurant.rate = None
+    restaurant.save()
+
     self.success_url = reverse_lazy('review_list', kwargs={'pk':self.kwargs['pk']})
     return super().form_valid(form)
     
@@ -611,9 +652,54 @@ class ReviewUpdateView(generic.UpdateView):
     pk = self.kwargs['pk']
     restaurant_id = models.Review.objects.filter(id=pk).first().restaurant.id
     return reverse_lazy('review_list', kwargs={'pk': restaurant_id})
-  
+
+  # def form_valid(self, form):
+  #   return super().form_valid(form)
+
   def form_valid(self, form):
-    return super().form_valid(form)
+    response = super().form_valid(form)
+    # return response    
+
+    # Get the restaurant associated with the review
+    # Here, we assume the review has a foreign key to restaurant
+    restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+    # Calculate the average rating for the restaurant
+    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+
+    # Update the restaurant's rate field
+    if average_rate is not None:
+        average_rate = round(average_rate, 2)
+        restaurant.rate = average_rate
+    else:
+        restaurant.rate = None
+
+    # Save the restaurant with the updated rate
+    restaurant.save()
+
+    return response
+  
+  # def form_valid(self, form):
+  #   print(f'hello')
+  #   response = super().form_valid(form)
+  #   print(f'hello')
+  #   return response    
+    # print(f'hello')
+    # response = super().form_valid(form)
+    # print(f'{response}')
+    # # restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+    # # pk = self.kwargs['pk']
+    # # restaurant = models.Restaurant.objects.filter(id=pk)
+    # # restaurant = form.instance.restaurant
+    # restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+    # print(f'{restaurant}')
+    # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+    # if average_rate is not None:
+    #   average_rate = round(average_rate, 2)
+    #   restaurant.rate = average_rate
+    # else:
+    #   restaurant.rate = None
+    # restaurant.save()
+    # return response    
   
   def form_invalid(self, form):
     return super().form_invalid(form)
@@ -626,6 +712,7 @@ class ReviewUpdateView(generic.UpdateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
     average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
     average_rate = round(average_rate, 2)
+    print(f'{ models.Review.visit_date }konnnitiwa')
     # if average_rate % 1 == 0:
     #   average_rate_star = int(average_rate)
     # else:
@@ -636,6 +723,7 @@ class ReviewUpdateView(generic.UpdateView):
       average_rate_star = int(average_rate)
 
     rate_count = models.Review.objects.filter(restaurant=restaurant).count()
+    print(f'konnnitiwa')
     context.update({
       'restaurant': restaurant,
       'average_rate': average_rate,
@@ -651,7 +739,19 @@ def review_delete(request):
   is_success = True
   if pk:
     try:
-      models.Review.objects.filter(id=pk).delete()
+      review = get_object_or_404(models.Review, id=pk)
+      restaurant = review.restaurant
+      review.delete()
+      # Update the review_num
+      restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
+      # Update the restaurant's rate field
+      average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+      if average_rate is not None:
+        average_rate = round(average_rate, 2)
+        restaurant.rate = average_rate
+      else:
+        restaurant.rate = None
+      restaurant.save()
     except:
       is_success = False
   else:
