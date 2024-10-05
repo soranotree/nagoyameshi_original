@@ -37,55 +37,65 @@
           <!-- Right Side Of Navbar-->
           <ul class="navbar-nav ms-auto">
             <!-- Authentication Links-->
-            {% if user.is_subscribed %}
+            {% comment %} ユーザー会員 {% endcomment %}
+            {% if user.is_subscribed and user.account_type == 1 %}
             <li class="nav-item dropdown">
               <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre> {{ user.user_name }} </a>
               <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">      
                 <a class="dropdown-item" {#TODO:1#} href="{% url 'user_detail' user.id %}">会員情報</a>
-                {% comment %} <a class="dropdown-item" {#TODO:1#} href="#">会員情報</a> {% endcomment %}
-                {# href="{% url 'user_detail' user.id %}">会員情報</a>#}
                 <a class="dropdown-item" {#TODO:2#} href="{% url 'reservation_list' %}">予約一覧</a>
-                {% comment %} <a class="dropdown-item" {#TODO:2#} href="#">予約一覧</a> {% endcomment %}
-                {# href="{% url 'reservation_list' %}">予約一覧</a>#}
                 <a class="dropdown-item" {#TODO:3#} href="{% url 'favorite_list' %}">お気に入り一覧</a>
-                {% comment %} <a class="dropdown-item" {#TODO:3#} href="#">お気に入り一覧</a> {% endcomment %}
-                {# href="{% url 'favorite_list' %}">お気に入り一覧</a>#}
                 <a class="dropdown-item" {#TODO:4#} href="{% url 'subscribe_payment' %}">お支払い方法</a>
-                {% comment %} <a class="dropdown-item" {#TODO:4#} href="#">お支払い方法</a> {% endcomment %}
-                {# href="{% url 'subscribe_payment' %}">お支払い方法</a>#}
                 <a class="dropdown-item" {#TODO:5#} href="{% url 'subscribe_cancel' %}">有料プラン解約</a>
-                {% comment %} <a class="dropdown-item" {#TODO:5#} href="#">有料プラン解約</a> {% endcomment %}
-                {# url 'subscribe_cancel' %}">有料プラン解約</a>#}
                 <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="{% url 'account_logout' %}">ログアウト</a>
               </div>
             </li>
-            
-            {% else %}
-            {% if user.is_authenticated %}
+            {% comment %} {% endif %} {% endcomment %}
+            {% elif user.is_authenticated and user.account_type == 1 %}
             <li class="nav-item dropdown">
               <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre> {{ user.user_name }} </a>
               <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown"> 
                 <a class="dropdown-item" {#TODO:6#} href="{% url 'user_detail' user.id %}">会員情報</a> 
-                {% comment %} <a class="dropdown-item" {#TODO:6#} href="#">会員情報</a>  {% endcomment %}
-                {% comment %} {# href="{% url 'user_detail' user.id %}">会員情報</a>#} {% endcomment %}
-                {% comment %} <a class="dropdown-item" {#TODO:7#} href="{% url 'subscribe_register' %}">有料プラン登録</a> {% endcomment %}
                 <a class="dropdown-item" {#TODO:7#} href="{% url 'subscribe_register' %}">有料プラン登録</a>
-                {% comment %} <a class="dropdown-item" {#TODO:7#} href="#">有料プラン登録</a> {% endcomment %}
-                {% comment %} {# href="{% url 'subscribe_register' %}">有料プラン登録</a>#} {% endcomment %}
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="{% url 'account_logout' %}">ログアウト</a>
+              </div>
+            </li>
+            {% comment %} 店舗会員 {% endcomment %}
+            {% elif user.is_subscribed and user.account_type == 2 %}
+            <li class="nav-item dropdown">
+              <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre> {{ user.user_name }} </a>
+              <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">      
+                <a class="dropdown-item" {#TODO:1#} href="{% url 'user_detail' user.id %}">会員情報</a>
+                <a class="dropdown-item" {#TODO:2#} href="{% url 'restaurant_list_2' user.id %}">店舗管理</a>
+                {% comment %} <a class="dropdown-item" {#TODO:2#} href="{% url 'restaurant_update' user.id %}">店舗ページ管理</a> {% endcomment %}
+                {% comment %} <a class="dropdown-item" {#TODO:3#} href="{% url 'r_reservation_mngt' %}">予約管理</a> {% endcomment %}
+                {% comment %} <a class="dropdown-item" {#TODO:3#} href="{% url 'r_review_mngt' %}">レビュー管理</a> {% endcomment %} 
+                <a class="dropdown-item" {#TODO:5#} href="{% url 'subscribe_cancel' %}">解約</a>
+                <a class="dropdown-item" {#TODO:4#} href="{% url 'subscribe_payment' %}">お支払い方法</a>
+                <div class="dropdown-divider"></div>
+                <a class="dropdown-item" href="{% url 'account_logout' %}">ログアウト</a>
+              </div>
+            </li>
+            {% elif user.is_authenticated and user.account_type == 2 %}
+            <li class="nav-item dropdown">
+              <a id="navbarDropdown" class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false" v-pre> {{ user.user_name }} </a>
+              <div class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown"> 
+                <a class="dropdown-item" {#TODO:6#} href="{% url 'user_detail' user.id %}">会員情報</a> 
+                <a class="dropdown-item" {#TODO:7#} href="{% url 'subscribe_register' %}">有料プラン登録</a>
                 <div class="dropdown-divider"></div>
                 <a class="dropdown-item" href="{% url 'account_logout' %}">ログアウト</a>
               </div>
             </li>
             {% else %}
-
             <li class="nav-item">
               <a class="nav-link" href="{% url 'account_login' %}">ログイン</a>
             </li>
             <li class="nav-item">
               <a class="nav-link" href="{% url 'account_signup' %}">新規登録</a>
             </li>
-            {% endif %}
+            {% comment %} {% endif %} {% endcomment %}
             {% endif %}
           </ul>
         </div>

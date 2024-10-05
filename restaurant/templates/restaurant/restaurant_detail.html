@@ -11,10 +11,7 @@
            <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'top_page' %}">ホーム</a></li>
             <li class="breadcrumb-item">
-              {# TODO:1#}
               <a href="{% url 'restaurant_list' %}?keyword=&button_type=keyword">店舗一覧</a>
-              {% comment %} <a href="#">店舗一覧</a> {% endcomment %}
-              {# <a href="{% url 'restaurant_list' %}?keyword=&button_type=keyword">店舗一覧</a>#}
             </li>
             <li class="breadcrumb-item active"  aria-current="page">店舗詳細</li>
           </ol>
@@ -30,17 +27,11 @@
           </li>
           <li class="nav-item">
             <a class="nav-link link-dark"
-            {# TODO:2#}
             href="{% url 'reservation_create' object.id %}">予約</a>
-            {% comment %} href="#">予約</a> {% endcomment %}
-            {# href="{% url 'reservation_create' object.id %}">予約</a>#}
           </li>
           <li class="nav-item">
             <a class="nav-link link-dark"
-            {# TODO:3#}
             href="{% url 'review_list' object.id %}">レビュー</a>
-            {% comment %} href="#">レビュー</a> {% endcomment %}
-            {# href="{% url 'review_list' object.id %}">レビュー</a>#}
           </li>
         </ul>
         <div class="mb-2">
@@ -59,7 +50,7 @@
           </div>
           <div class="row pb-2 mb-2 border-bottom">
             <div class="col-2">
-              <span class="fw-bold">説明</span>
+              <span class="fw-bold">説　明</span>
             </div>
             <div class="col">
               <span>{{ object.description }}</span>
@@ -83,10 +74,26 @@
           </div>
           <div class="row pb-2 mb-2 border-bottom">
             <div class="col-2">
-              <span class="fw-bold">住所</span>
+              <span class="fw-bold">住　所</span>
             </div>
             <div class="col">
               <span>{{ object.address }}</span>
+            </div>
+          </div>
+          <div class="row pb-2 mb-2 border-bottom">
+            <div class="col-2">
+              <span class="fw-bold">電　話</span>
+            </div>
+            <div class="col">
+              <span>{{ object.phone }}</span>
+            </div>
+          </div>
+          <div class="row pb-2 mb-2 border-bottom">
+            <div class="col-2">
+              <span class="fw-bold">Email</span>
+            </div>
+            <div class="col">
+              <span>{{ object.email }}</span>
             </div>
           </div>
           <div class="row pb-2 mb-2 border-bottom">

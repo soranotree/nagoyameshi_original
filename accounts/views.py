@@ -1,3 +1,4 @@
+from django.contrib.auth.views import LoginView
 from django.shortcuts import render, redirect
 from django.urls import reverse_lazy
 from django.views import generic, View
@@ -6,6 +7,18 @@ from . import forms
 from . import models
 
 # Create your views here.
+
+# class CustomLoginView(LoginView):
+#     template_name = 'account/login.html'
+
+#     def get_success_url(self):
+#         user = self.request.user
+#         if user.is_authenticated:
+#             if user.account_type == 2:  # Shop owner
+#                 return reverse_lazy('user_detail')  # Redirect to shop owner's page
+#             else:
+#                 return reverse_lazy('top_page')  # Redirect normal user to top page
+#         return super().get_success_url()
 
 class UserDetailView(generic.DetailView):
   model = models.CustomUser

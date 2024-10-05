@@ -97,7 +97,8 @@
             <input type="hidden" name="button_type" value="select_sort">
           </form>
         </div>
-        {% for restaurant,rate,rate_star,rate_num in restaurant_list %}
+        {% for restaurant,rate,rate_star in restaurant_list %}
+        {% comment %} {% for restaurant,rate,rate_star,rate_num in restaurant_list %} {% endcomment %}
         <div class="mb-3">
           <a href="{% url 'restaurant_detail' restaurant.id %}" class="link-dark card-link">
             <div class="card h-100">
@@ -119,7 +120,8 @@
                     <hr class="my-2">
                     <p class="mb-1">
                       <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>
-                      {{ rate|floatformat:2 }}（{{ rate_num }}件）
+                      {{ rate|floatformat:2 }}（{{ restaurant.review_num }}件）
+                      {% comment %} {{ rate|floatformat:2 }}（{{ rate_num }}件） {% endcomment %}
                     </p>
                     <div class="mb-1">
                       <span>{{ restaurant.min_price }}円～{{ restaurant.max_price }}円</span>

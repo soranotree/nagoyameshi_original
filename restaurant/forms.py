@@ -1,5 +1,5 @@
 from django import forms
-from .models import Reservation, Review
+from .models import Reservation, Review, Restaurant
 
 class ReservationCreateForm(forms.ModelForm):
   class Meta:
@@ -34,3 +34,38 @@ class ReviewCreateForm(forms.ModelForm):
     self.fields['comment'].widget.attrs['cols'] = '30'
     self.fields['comment'].widget.attrs['rows'] = '5'
     self.fields['rate'].widget.attrs['class'] = 'form-check-input'
+
+class RestaurantCreateForm(forms.ModelForm):
+  class Meta:
+    model = Restaurant
+    fields = '__all__'
+    # fields = ('visit_date', 'comment', 'rate')
+    # widgets = {'rate': forms.RadioSelect()}
+  
+  # def __init__(self, *args, **kwargs):
+  #   super().__init__(*args, **kwargs)
+  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+  #   self.fields['visit_date'].widget.attrs['id'] = 'visit_date'
+  #   self.fields['visit_date'].widget.attrs['name'] = 'visit_date'
+  #   self.fields['comment'].widget.attrs['class'] = 'form-control'
+  #   self.fields['comment'].widget.attrs['cols'] = '30'
+  #   self.fields['comment'].widget.attrs['rows'] = '5'
+  #   self.fields['rate'].widget.attrs['class'] = 'form-check-input'
+
+class RestaurantUpdateForm(forms.ModelForm):
+  class Meta:
+    model = Restaurant
+    fields = '__all__'
+    exclude = ['rate', 'review_num', 'reservation_num', 'price', 'max_price', 'min_price', 'shop_owner']
+    # fields = ('visit_date', 'comment', 'rate')
+    # widgets = {'rate': forms.RadioSelect()}
+  
+  # def __init__(self, *args, **kwargs):
+  #   super().__init__(*args, **kwargs)
+  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+  #   self.fields['visit_date'].widget.attrs['id'] = 'visit_date'
+  #   self.fields['visit_date'].widget.attrs['name'] = 'visit_date'
+  #   self.fields['comment'].widget.attrs['class'] = 'form-control'
+  #   self.fields['comment'].widget.attrs['cols'] = '30'
+  #   self.fields['comment'].widget.attrs['rows'] = '5'
+  #   self.fields['rate'].widget.attrs['class'] = 'form-check-input'
