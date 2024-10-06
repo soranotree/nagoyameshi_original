@@ -6,4 +6,5 @@ urlpatterns = [
   path("subscribe-register/", views.SubscribeRegisterView.as_view(), name="subscribe_register"),
   path("subscribe-cancel/", views.SubscribeCancelView.as_view(), name="subscribe_cancel"),
   path("subscribe-payment/", views.SubscribePaymentView.as_view(), name="subscribe_payment"),
+  path("login/", views.CustomLoginView.as_view(), name='login'),
 ]

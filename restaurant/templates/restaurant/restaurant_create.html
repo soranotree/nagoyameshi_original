@@ -1,0 +1,89 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% block title %}NAGOYAMESHI{% endblock %}
+{% block content %}
+{% load humanize %}
+<main>
+  <div class="container nagoyameshi-container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
+        <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page">新規店舗登録</li>
+          </ol>
+        </nav>
+        <h1 class="mb-3 text-center">新規店舗の登録</h1>
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br><br>
+
+        {% comment %} <ul class="nav nav-tabs mb-2">
+          <li class="nav-item">
+            <a class="nav-link active bg-primary text-white" aria-current="page" href="{% url 'restaurant_detail' object.id %}">トップ</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link link-dark"
+            href="{% url 'reservation_create' object.id %}">予約</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link link-dark"
+            href="{% url 'review_list' object.id %}">レビュー</a>
+          </li>
+        </ul> {% endcomment %}
+
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            {{ form.errors }}  <!-- Add this line for error debugging -->
+            <div class="mb-3">
+              <label for="shop_name" class="form-label fw-bold">店舗名　</label>
+              {{ form.shop_name }}
+            </div>
+            <div class="mb-3">
+              <label for="owner_name" class="form-label fw-bold">店長名　</label>
+              {{ form.owner_name }}
+            </div>
+            <div class="mb-3">
+              <label for="zip_code" class="form-label fw-bold">郵便番号　</label>
+              {{ form.zip_code }}
+            </div>
+            <div class="mb-3">
+              <label for="address" class="form-label fw-bold">住所　</label>
+              {{ form.address }}
+            </div>
+            <div class="mb-3">
+              <label for="phone" class="form-label fw-bold">電話番号　</label>
+              {{ form.phone }}
+            </div>
+            <div class="mb-3">
+              <label for="email" class="form-label fw-bold">HP表示用メールアドレス　</label>
+              {{ form.email }}
+            </div>
+            <div class="mb-3">
+              <label for="category" class="form-label fw-bold">カテゴリー　</label>
+              {{ form.category }}
+            </div>
+            <div class="mb-3">
+              <label for="description" class="form-label text-md-left fw-bold">店舗説明</label>
+              {% comment %} <label for="description" class="form-label">店舗説明</label> {% endcomment %}
+              {{ form.description }}
+            </div>
+            <div class="mb-3">
+              <label for="business_time" class="form-label fw-bold">営業時間　</label>
+              {{ form.business_time }}
+            </div>
+            <div class="mb-3">
+              <label for="close_day_of_week" class="form-label fw-bold">定休日　</label>
+              {{ form.close_day_of_week }}
+            </div>
+            <div class="mb-3">
+              <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+              <button type="submit" class="btn btn-primary">登録</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+{% endblock %}

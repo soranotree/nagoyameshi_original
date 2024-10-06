@@ -1,5 +1,5 @@
 from django import forms
-from .models import Reservation, Review, Restaurant
+from .models import Reservation, Review, Restaurant, DiningTable
 
 class ReservationCreateForm(forms.ModelForm):
   class Meta:
@@ -39,18 +39,18 @@ class RestaurantCreateForm(forms.ModelForm):
   class Meta:
     model = Restaurant
     fields = '__all__'
+    exclude = ['rate', 'review_num', 'reservation_num', 'price', 'max_price', 'min_price', 'shop_owner']
     # fields = ('visit_date', 'comment', 'rate')
     # widgets = {'rate': forms.RadioSelect()}
-  
-  # def __init__(self, *args, **kwargs):
-  #   super().__init__(*args, **kwargs)
-  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
-  #   self.fields['visit_date'].widget.attrs['id'] = 'visit_date'
-  #   self.fields['visit_date'].widget.attrs['name'] = 'visit_date'
-  #   self.fields['comment'].widget.attrs['class'] = 'form-control'
-  #   self.fields['comment'].widget.attrs['cols'] = '30'
-  #   self.fields['comment'].widget.attrs['rows'] = '5'
-  #   self.fields['rate'].widget.attrs['class'] = 'form-check-input'
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.fields['description'].widget = forms.Textarea()
+    self.fields['description'].widget.attrs['class'] = 'form-control'
+    self.fields['description'].widget.attrs['rows'] = '10'  # Specify the number of rows for the textarea
+    self.fields['description'].widget.attrs['placeholder'] = '店舗の詳細を記入してください'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+    self.fields['business_time'].widget.attrs['placeholder'] = '例：9:30～22:00'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+    self.fields['close_day_of_week'].widget.attrs['placeholder'] = '例：「火、水」、「不定休」、「年中無休」'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
 
 class RestaurantUpdateForm(forms.ModelForm):
   class Meta:
@@ -60,12 +60,30 @@ class RestaurantUpdateForm(forms.ModelForm):
     # fields = ('visit_date', 'comment', 'rate')
     # widgets = {'rate': forms.RadioSelect()}
   
-  # def __init__(self, *args, **kwargs):
-  #   super().__init__(*args, **kwargs)
-  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    # self.fields['description'].widget.attrs['class'] = 'form-control'
+    # self.fields['description'].widget.attrs['rows'] = '15'  # Specify the number of rows for the textarea
+    self.fields['description'].widget = forms.Textarea()
+    self.fields['description'].widget.attrs['class'] = 'form-control'
+    self.fields['description'].widget.attrs['cols'] = '30'
+    self.fields['description'].widget.attrs['rows'] = '5'
+
+
+    # self.fields['description'].widget.attrs['placeholder'] = '店舗の詳細を記入してください'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
   #   self.fields['visit_date'].widget.attrs['id'] = 'visit_date'
   #   self.fields['visit_date'].widget.attrs['name'] = 'visit_date'
   #   self.fields['comment'].widget.attrs['class'] = 'form-control'
   #   self.fields['comment'].widget.attrs['cols'] = '30'
   #   self.fields['comment'].widget.attrs['rows'] = '5'
   #   self.fields['rate'].widget.attrs['class'] = 'form-check-input'
+
+class DiningTableUpdateForm(forms.ModelForm):
+    class Meta:
+        model = DiningTable
+        fields = ['name_for_internal', 'name_for_customer', 'min_people', 'max_people']
+        
+class DiningTableCreateForm(forms.ModelForm):
+    class Meta:
+        model = DiningTable
+        fields = ['name_for_internal', 'name_for_customer', 'min_people', 'max_people']

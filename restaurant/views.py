@@ -778,89 +778,36 @@ class RestaurantListView2(generic.ListView):
   def get_queryset(self):
     return models.Restaurant.objects.filter(shop_owner=self.request.user)
 
-  # def get_context_data(self, **kwargs):
-  #   pk = self.kwargs['pk']
-  #   context = super(RestaurantListView2, self).get_context_data(**kwargs)
-  #   restaurant = models.Restaurant.objects.filter(id=pk).first()
-  #   context.update({
-  #     })
-  #   return context
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    today = datetime.now()
+    # Add extra data (counts) for each restaurant in the context
+    restaurants = context['object_list']
+    for restaurant in restaurants:
+      restaurant.dining_table_count = restaurant.diningtable_set.count()
+      restaurant.reservation_count = restaurant.reservation_set.filter(date__gte=today).count()
+      restaurant.menu_count = restaurant.menu_set.count()
+    return context
+
 """ レストランの作成 ================================== """
 class RestaurantCreateView(generic.CreateView):
   template_name = "restaurant/restaurant_create.html"
   model = models.Restaurant
   form_class = forms.RestaurantCreateForm
-  success_url = None
   
-  def get(self, request, **kwargs):
-    user = request.user
-    if user.is_authenticated and user.is_subscribed:
-      return super().get(request, **kwargs)
-    if not user.is_authenticated:
-      return redirect(reverse_lazy('account_login'))
-    if not user.is_subscribed:
-      return redirect(reverse_lazy('subscribe_register'))
-    
   def form_valid(self, form):
-    user_instance = self.request.user
-    restaurant_instance = models.Restaurant(id=self.kwargs['pk'])
-    review = form.save(commit=False)
-    review.restaurant = restaurant_instance
-    review.customer = user_instance
-    review.save()
-
-    # Update the restaurant's rate field
-    restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
-    if average_rate is not None:
-        average_rate = round(average_rate, 2)
-        restaurant.rate = average_rate
-    else:
-        restaurant.rate = None
-    restaurant.save()
-
-    self.success_url = reverse_lazy('review_list', kwargs={'pk':self.kwargs['pk']})
+  # Set the `shop_owner` to the currently logged-in user before saving
+    form.instance.shop_owner = self.request.user
     return super().form_valid(form)
-    
-  def form_invalid(self, form):
-    self.success_url = reverse_lazy('review_create', kwargs={'pk':self.kwargs['pk']})
-    return super().form_invalid(form)
-    
-  def get_context_data(self, **kwargs):
-    pk = self.kwargs['pk']
-    context = super(ReviewCreateView, self).get_context_data(**kwargs)
-    restaurant = models.Restaurant.objects.filter(id=pk).first()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
 
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
-
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
-    context.update({
-      'restaurant': restaurant,
-      'average_rate': average_rate,
-      'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
-      })
-    return context
+  def get_success_url(self):
+    return reverse_lazy('restaurant_list_2', kwargs={'pk': self.request.user.pk})
 
 """ 保有レストランの更新 ================================== """
 class RestaurantUpdateView(generic.UpdateView):
     model = models.Restaurant
     template_name = 'restaurant/restaurant_update.html'
     form_class = forms.RestaurantUpdateForm
-
-    def get_queryset(self):
-        # ログイン中の店舗ユーザーが所有するレストランのみを取得
-        return models.Restaurant.objects.filter(shop_owner=self.request.user)
 
     def get_success_url(self):
         return reverse_lazy('restaurant_list_2', kwargs={'pk': self.request.user.id})
@@ -891,3 +838,65 @@ class RestaurantUpdateView(generic.UpdateView):
 #     is_success = False
   
 #   return JsonResponse({'is_success': is_success})
+
+""" ダイニングテーブル一覧 ================================== """
+class DiningTableListView(generic.ListView):
+  template_name = "dining_table/dining_table_list.html"
+  model = models.DiningTable
+  # ordering = ['-created_at']
+  paginate_by = 20
+  
+  def get_queryset(self):
+    restaurant_id = self.kwargs.get('restaurant_id')
+    return models.DiningTable.objects.filter(restaurant_id=restaurant_id)
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    restaurant_id = self.kwargs.get('restaurant_id')
+    context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+    return context
+
+""" ダイニングテーブル編集 ================================== """
+class DiningTableUpdateView(generic.UpdateView):
+    model = models.DiningTable
+    form_class = forms.DiningTableUpdateForm
+    template_name = 'dining_table/dining_table_update.html'
+
+    def get_queryset(self):
+        # Ensure only dining tables for the specified restaurant are allowed
+        restaurant_id = self.kwargs['restaurant_id']
+        return models.DiningTable.objects.filter(restaurant__id=restaurant_id)
+
+    def get_success_url(self):
+        # Redirect back to the dining table list after updating
+        restaurant_id = self.kwargs['restaurant_id']
+        return reverse_lazy('dining_table_list', kwargs={'restaurant_id': restaurant_id})
+
+    def get_context_data(self, **kwargs):
+        # Pass the restaurant object to the template
+        context = super().get_context_data(**kwargs)
+        restaurant_id = self.kwargs['restaurant_id']
+        context['restaurant'] = get_object_or_404(models.Restaurant, pk=restaurant_id)
+        return context
+
+class DiningTableCreateView(generic.CreateView):
+    template_name = 'dining_table/dining_table_create.html'
+    model = models.DiningTable
+    form_class = forms.DiningTableCreateForm
+
+    def form_valid(self, form):
+        # Link the table to the correct restaurant using the restaurant_id from the URL
+        restaurant_id = self.kwargs['restaurant_id']
+        form.instance.restaurant = models.Restaurant.objects.get(id=restaurant_id)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        # Redirect to the list of dining tables for the restaurant after creating the table
+        restaurant_id = self.kwargs['restaurant_id']
+        return reverse_lazy('dining_table_list', kwargs={'restaurant_id': restaurant_id})
+
+    def get_context_data(self, **kwargs):
+        # Pass the restaurant context to the template
+        context = super().get_context_data(**kwargs)
+        context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
+        return context

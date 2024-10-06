@@ -8,17 +8,19 @@ from . import models
 
 # Create your views here.
 
-# class CustomLoginView(LoginView):
-#     template_name = 'account/login.html'
-
-#     def get_success_url(self):
-#         user = self.request.user
-#         if user.is_authenticated:
-#             if user.account_type == 2:  # Shop owner
-#                 return reverse_lazy('user_detail')  # Redirect to shop owner's page
-#             else:
-#                 return reverse_lazy('top_page')  # Redirect normal user to top page
-#         return super().get_success_url()
+class CustomLoginView(LoginView):
+  template_name = 'account/login.html'
+  def get_success_url(self):
+    print(f'フラグです')
+    user = self.request.user
+    if user.is_authenticated:
+      if user.account_type == 2:  # Shop owner
+        return reverse_lazy('restaurant_list_2')  # Redirect to shop owner's page
+        # return reverse_lazy('user_detail')  # Redirect to shop owner's page
+      else:
+        return reverse_lazy('top_page')  # Redirect normal user to top page
+        # return reverse_lazy('restaurant_list_2')  # Redirect to shop owner's page
+    return super().get_success_url()
 
 class UserDetailView(generic.DetailView):
   model = models.CustomUser

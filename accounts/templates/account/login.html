@@ -7,7 +7,8 @@
     <div class="row justify-content-center">
       <div class="col-xl-3 col-lg-4 col-md-5 col-sm-7">
         <h1 class="mb-4 text-center">ログイン</h1>
-        <form method="post" action="{% url 'account_login' %}">
+        <form method="post" action="{% url 'login' %}">
+        {% comment %} <form method="post" action="{% url 'account_login' %}"> {% endcomment %}
           {% csrf_token %}
           <label for="name" class="col-md-5 col-form-label text-md-left fw-bold">
             <span class="me-1">メールアドレス</span>
@@ -16,7 +17,7 @@
             {{ form.login }}
           </div>
           <label for="name" class="col-md-5 col-form-label text-md-left fw-bold">
-            <span class="me-1">パスワードaaa</span>
+            <span class="me-1">パスワード</span>
           </label>
           <div class="form-group mb-3">
             {{ form.password }}
@@ -27,6 +28,7 @@
               <label class="form-check-label" for="remember">次回から自動的にログインする</label>
             </div>
           </div>
+          {% comment %} 20241005ここから3行をコメントアウトしても動作は変わらず {% endcomment %}
           {% if redirect_field_value %}
           <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
           {% endif %}

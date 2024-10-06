@@ -24,10 +24,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-ofmelqfjp5!@v!28-$#)&m0t(hmz5qgep6g(j3%h#z5@q4_b$3"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+if os.path.exists("./.is_debug"):
+    DEBUG = True
+else:
+    DEBUG = False
 
 ALLOWED_HOSTS = ["127.0.0.1", ".herokuapp.com"]
-
 
 # Application definition
 
@@ -49,6 +51,9 @@ INSTALLED_APPS = [
     "allauth.socialaccount",
 ]
 
+if DEBUG:
+    INSTALLED_APPS += ['debug_toolbar']
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -58,6 +63,14 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if DEBUG:
+    MIDDLEWARE += ['debug_toolbar.middleware.DebugToolbarMiddleware']
+    INTERNAL_IPS = ['127.0.0.1']
+
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK" : lambda request: True,
+    }
 
 ROOT_URLCONF = "nagoyameshi.urls"
 

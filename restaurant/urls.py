@@ -18,6 +18,9 @@ urlpatterns = [
   path('review-update/<int:pk>/', views.ReviewUpdateView.as_view(), name="review_update"),
   path('review-delete', views.review_delete, name='review_delete'),
   path("restaurant-list-2/<int:pk>/", views.RestaurantListView2.as_view(), name="restaurant_list_2"),
-  path("restaurant-create/<int:pk>/", views.RestaurantCreateView.as_view(), name="restaurant_create"),
+  path("restaurant-create/", views.RestaurantCreateView.as_view(), name="restaurant_create"),
   path("restaurant-update/<int:pk>/", views.RestaurantUpdateView.as_view(), name="restaurant_update"),
+  path('restaurant/<int:restaurant_id>/dining-tables/', views.DiningTableListView.as_view(), name='dining_table_list'),
+  path('restaurant/<int:restaurant_id>/dining-tables/update/<int:pk>/', views.DiningTableUpdateView.as_view(), name='dining_table_update'),
+  path('restaurant/<int:restaurant_id>/dining-tables/create/', views.DiningTableCreateView.as_view(), name='dining_table_create'),
   ]

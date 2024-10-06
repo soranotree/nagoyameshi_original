@@ -1,0 +1,50 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% block title %}NAGOYAMESHI{% endblock %}
+{% block content %}
+{% load humanize %}
+<main>
+  <div class="container nagoyameshi-container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
+        <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' restaurant.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'dining_table_list' restaurant.id %}">ダイニングテーブル一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page">ダイニングテーブル新規作成</li>
+          </ol>
+        </nav>
+        <h1 class="mb-3 text-center">ダイニングテーブルの新規作成</h1>
+        <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
+        <br><br>
+        <div class="card-body">
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+            {{ form.errors }}
+            
+            <div class="mb-3">
+              <label for="name_for_internal" class="form-label fw-bold">店内用名称　</label>
+              {{ form.name_for_internal }}
+            </div>
+            <div class="mb-3">
+              <label for="name_for_customer" class="form-label fw-bold">HP掲載用名称　</label>
+              {{ form.name_for_customer }}
+            </div>
+            <div class="mb-3">
+              <label for="min_people" class="form-label fw-bold">最少人数　</label>
+              {{ form.min_people }}
+            </div>
+            <div class="mb-3">
+              <label for="max_people" class="form-label fw-bold">最大人数　</label>
+              {{ form.max_people }}
+            </div>
+            <div class="mb-3">
+              <a href="{% url 'dining_table_list' restaurant.id %}">戻る</a>
+              <button class="btn btn-primary" type="submit">登録</button>
+            </div>
+          </form>        </div>
+      </div>
+    </div>
+  </main>
+{% endblock %}
