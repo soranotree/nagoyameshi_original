@@ -26,6 +26,7 @@
               <th scope="col">予約枠</th>
               <th scope="col">メニュー</th>
               <th scope="col">テーブル</th>
+              <th scope="col">レビュー</th>
               <th scope="col">操作</th>
             </tr>
           </thead>
@@ -34,18 +35,30 @@
             <tr>
               <td>
                 {% comment %} <a href="{% url 'restaurant_detail' reserve.restaurant.id %}"> {% endcomment %}
-                  {{ restaurant.shop_name }}
-                {% comment %} </a> {% endcomment %}
+                  <a href="{% url 'restaurant_detail' restaurant.id %}">
+                    {{ restaurant.shop_name }}
+                  </a>
+                  {% comment %} </a> {% endcomment %}
               </td>
               <td>{{ restaurant.owner_name }}</td>
               <td>{{ restaurant.address }}</td>
-              <td>{{ restaurant.reservation_count }}枠</td>
-              <td>{{ restaurant.menu_count }}件</td>
+              <td>{{ restaurant.reservation_count }}個</td>
+              <td>
+                <a href="{% url 'menu_list' restaurant.id %}">
+                  {{ restaurant.menu_count }}件
+                </a>
+              </td>
               <td>
                 <a href="{% url 'dining_table_list' restaurant.id %}">
                   {{ restaurant.dining_table_count }}台
                 </a>
               </td>
+              <td>
+                <a href="{% url 'review_list2' restaurant.id %}">
+                  未返信{{ restaurant.replies_count }}件／全{{ restaurant.review_num }}件
+                </a>
+              </td>
+
               <td>
                 <button class="btn btn-primary" onclick="location.href='{% url 'restaurant_update' pk=restaurant.pk %}'">編集</button>
               </td>

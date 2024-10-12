@@ -43,14 +43,9 @@
 <div class="container nagoyameshi-container">
   <h2 class="mb-3">評価が高いお店</h2>
   <div class="row row-cols-xl-6 row-cols-md-3 row-cols-2 g-3 mb-5">
-    {#TODO:6#}
-    {% for restaurant,rate,rate_star in restaurant_list|slice:":10" %}
-    {% comment %} {% for restaurant in restaurant_list %} {% endcomment %}
-    {# {% for restaurant,rate,rate_star in restaurant_list %}#}
+    {% for restaurant in restaurant_list|slice:":15" %}
     <div class="col">
-      {#TODO:2#}
       <a href="{% url 'restaurant_detail' restaurant.id %}" class="link-dark card-link">
-      {% comment %} <a href="#" class="link-dark card-link"> {% endcomment %}
         <div class="card h-100">
           {% if restaurant.photo %}
           <img src="{{ restaurant.photo.url }}"
@@ -64,13 +59,8 @@
               </div>
             </div>
             <p class="card-text">
-              {#TODO:7#}
-              <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>
-              {{ rate|floatformat:2 }}
-              {% comment %} <span class="star-rating me-1" data-rate="5"></span> {% endcomment %}
-              {% comment %} 5.0 {% endcomment %}
-                {# <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>#}
-                {# {{ rate }}#}
+              <span class="star-rating me-1" data-rate="{{ restaurant.rate_star }}"></span>
+              {{ restaurant.rate|floatformat:2 }}
               </p>
             </div>
           </div>
@@ -102,27 +92,22 @@
       {% endif %}
       {% endfor %}
     </div>
+    <br>
+
     <div class="mb-5">
       {% for category in category_list %}
       {% if forloop.counter > 6 %}
-      {#TODO:4#}
       <a href="{% url 'restaurant_list' %}?category={{ category.name }}&button_type=category" class="btn btn-outline-secondary btn-sm me-1 mb-2">{{ category.name }}</a>
       {% endif %}
       {% endfor %}
     </div>
 
     {# 新規掲載店 #}
-
     <h2 class="mb-3">新規掲載店</h2>
-
     <div class="row row-cols-xl-6 row-cols-md-3 row-cols-2 g-3 mb-5">
-
-      {% for new_restaurant in new_restaurant_list %}
+      {% for new_restaurant in new_restaurant_list|slice:":15" %}
       <div class="col">
-        {#TODO:5#}
         <a href="{% url 'restaurant_detail' new_restaurant.id %}" class="link-dark card-link">
-        {% comment %} <a href="#" class="link-dark card-link"> {% endcomment %}
-          {# <a href="{% url 'restaurant_detail' new_restaurant.id %}" class="link-dark card-link">#}
           <div class="card h-100">
             {% if new_restaurant.photo %}
             <img src="{{ new_restaurant.photo.url }}" class="card-img-top vertical-card-image">
@@ -135,7 +120,10 @@
                 </div>
               </div>
               <p class="card-text">{{ new_restaurant.description|truncatechars:20 }}</p>
-              <p class="card-text">★テスト用：掲載日{{ new_restaurant.created_at }}</p>
+              {% comment %} 新規掲載店でレビュー少ないため非掲載 {% endcomment %}
+              {% comment %} <span class="star-rating me-1" data-rate="{{ new_restaurant.rate_star }}"></span> {% endcomment %}
+              {% comment %} {{ new_restaurant.rate|floatformat:2 }} {% endcomment %}
+              <p class="card-text">{{ new_restaurant.created_at|date:"Y/m/d" }} 掲載</p>
             </div>
            </div>
         </a>

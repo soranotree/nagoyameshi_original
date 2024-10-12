@@ -16,6 +16,7 @@
         </nav>
         <h1 class="mb-3 text-center">ダイニングテーブル情報の更新</h1>
         <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
+        <a href="{% url 'dining_table_list' restaurant.id %}">戻る</a>
         <br><br>
         <div class="card-body">
           <form method="post" enctype="multipart/form-data">

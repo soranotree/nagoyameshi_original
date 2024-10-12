@@ -17,8 +17,9 @@
         <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
         {% comment %} <a href="{% url 'dining_table_create' %}">ダイニングテーブルの追加</a> {% endcomment %}
 
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br>
         <a href="{% url 'dining_table_create' restaurant.id %}">新規作成</a>
-        {% comment %} <a href="{% url 'restaurant_list_2' restaurant.id %}">戻る</a> {% endcomment %}
 
         <table class="table">
           <thead>
@@ -44,6 +45,8 @@
             {% endfor %}
           </tbody>
         </table>
+
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
 
         <!-- ページネーション処理-->
         {% if is_paginated %}

@@ -34,6 +34,7 @@ class Restaurant(models.Model):
   business_time = models.CharField(verbose_name='営業時間', max_length=64, null=True, blank=True)
   close_day_of_week = models.CharField(verbose_name='定休日', max_length=32, null=True, blank=True)
   rate = models.FloatField(verbose_name='レート', default=0.0)
+  rate_star = models.FloatField(verbose_name='レートスター', default=0.0)
   review_num = models.IntegerField(verbose_name='レビュー数', default=0)
   reservation_num = models.IntegerField(verbose_name='予約数', default=0)
   created_at = models.DateTimeField(verbose_name='作成日時', auto_now_add=True)

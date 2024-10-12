@@ -1,0 +1,100 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% block title %}NAGOYAMESHI{% endblock %}
+{% block content %}
+<main>
+
+  <div class="container nagoyameshi-container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
+        <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' restaurant.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page">レビュー一覧</li>
+          </ol>
+        </nav>
+        <h1 class="mb-3 text-center">レビュー一覧</h1>
+        <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
+
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br>
+        {% comment %} <a href="{% url 'review_reply' restaurant.id %}"></a> {% endcomment %}
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">訪問日</th>
+              <th scope="col">投稿日</th>
+              <th scope="col">評価</th>
+              <th scope="col">顧客名</th>
+              <th scope="col">コメント</th>
+              <th scope="col">返信</th>
+              <th scope="col">非表示</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for review in object_list %}
+            <tr>
+              <td>{{ review.visit_date|date:"Y/m/d" }}</td>
+              <td>{{ review.created_at|date:"Y/m/d" }}</td>
+              <td>{{ review.rate }}</td>
+              <td>{{ review.customer.user_name }}</td>
+              <td>{{ review.comment }}</td>
+              <td>{{ review.reply|default:"未返信" }}</td>
+              <td>
+                {{ review.display_masked|yesno:"非表示,表示" }}
+              </td>
+              <td>
+                <a href="{% url 'review_update2' review.pk %}" class="btn btn-sm btn-primary">
+                  返信編集
+                </a>
+                <form method="post" action="{% url 'toggle_display_masked' review.pk %}" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-warning">
+                    {{ review.display_masked|yesno:"表示にする,非表示にする" }}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+
+        <!-- ページネーション処理-->
+        {% if is_paginated %}
+        <div class="d-flex justify-content-center">
+          <nav>
+            <ul class="pagination">
+              <!-- 前ページへのリンク-->
+              {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}" rel="prev" aria-label="&laquo; 前">&lsaquo;</a>
+              </li>
+              {% endif %}
+
+              <!-- ページ数表示-->
+              {% for page_num in page_obj.paginator.page_range %}
+              {% if page_obj.number == page_num %}
+              <li class="page-item active" aria-current="page"><span class="page-link">{{ page_num }}</span></li>
+              {% else %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a></li>
+              {% endif %}
+              {% endfor %}
+
+              <!-- 次ページへのリンク-->
+              {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}" rel="next" aria-label="次 &raquo;">&rsaquo;</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+

@@ -1,5 +1,5 @@
 from django import forms
-from .models import Reservation, Review, Restaurant, DiningTable
+from .models import Reservation, Review, Restaurant, DiningTable, Menu
 
 class ReservationCreateForm(forms.ModelForm):
   class Meta:
@@ -87,3 +87,48 @@ class DiningTableCreateForm(forms.ModelForm):
     class Meta:
         model = DiningTable
         fields = ['name_for_internal', 'name_for_customer', 'min_people', 'max_people']
+        
+class MenuUpdateForm(forms.ModelForm):
+    class Meta:
+        model = Menu
+        fields = ['name', 'description', 'price', 'available_from', 'available_end', 'photo']
+
+    def __init__(self, *args, **kwargs):
+      super().__init__(*args, **kwargs)
+      self.fields['available_from'].widget = forms.TimeInput(
+            format='%H:%M',
+            attrs={
+                'class': 'form-control',  # Add Bootstrap or custom class if needed
+            }
+        )
+      self.fields['available_end'].widget = forms.TimeInput(
+            format='%H:%M',
+            attrs={
+                'class': 'form-control',  # Add Bootstrap or custom class if needed
+            }
+        )
+
+class MenuCreateForm(forms.ModelForm):
+    class Meta:
+        model = Menu
+        fields = ['name', 'description', 'price', 'available_from', 'available_end', 'photo']
+        
+    def __init__(self, *args, **kwargs):
+      super().__init__(*args, **kwargs)
+      self.fields['name'].widget.attrs['placeholder'] = '例：〇〇定食、〇〇コース'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+      self.fields['description'].widget.attrs['placeholder'] = '例：当店おススメのメニューです。ごゆっくりお召し上がりください。'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+      self.fields['price'].widget.attrs['placeholder'] = '例：800'  # Optional placeholder text  #   self.fields['visit_date'].widget.attrs['class'] = 'form-control'
+      self.fields['available_from'].widget = forms.TimeInput(
+            format='%H:%M',
+            attrs={
+                'class': 'form-control',  # Add Bootstrap or custom class if needed
+                'placeholder': '例：9:00',  # Optional placeholder text
+            }
+        )
+      self.fields['available_end'].widget = forms.TimeInput(
+            format='%H:%M',
+            attrs={
+                'class': 'form-control',  # Add Bootstrap or custom class if needed
+                'placeholder': '例：21:30',  # Optional placeholder text
+            }
+        )

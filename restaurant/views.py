@@ -1,11 +1,11 @@
 from datetime import date, datetime, timedelta
 from django.contrib import messages
-from django.db.models import Avg, Sum
+from django.db.models import Avg, Sum, Min, Max
 from django.db.models import Q
 from django.db.models import F
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views import generic
 
 from . import models
@@ -16,7 +16,6 @@ class TopPageView(generic.ListView):
   template_name = "top_page.html"
   model = models.Restaurant
   queryset = models.Restaurant.objects.order_by('-rate')
-  context_object_name = 'restaurant_list'
   
   def get_context_data(self, **kwargs):
     if 'price_session' in self.request.session:
@@ -30,30 +29,19 @@ class TopPageView(generic.ListView):
     
     context = super(TopPageView, self).get_context_data(**kwargs)
     category_list = models.Category.objects.all()
+    restaurant_list = models.Restaurant.objects.order_by('-rate')
     new_restaurant_list = models.Restaurant.objects.all().order_by('-created_at')
     
-    # querysetに含まれるレストランの平均レートを、レストランごとに取得して配列に格納
-    average_rate_list = []
-    average_rate_star_list = []
-    for restaurant in context['restaurant_list']:
-      average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-      average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-      average_rate_list.append(round(average_rate, 2))
-      # if average_rate % 1 == 0:
-      #   average_rate = int(average_rate)
-      # else:
-      #   average_rate = round(average_rate * 2) / 2
-
-      average_rate = round(average_rate * 2) / 2
-      if average_rate % 1 == 0:
-        average_rate = int(average_rate)
-
-      average_rate_star_list.append(average_rate)
+    for restaurant in restaurant_list:
+      restaurant.rate_star = round(restaurant.rate * 2) / 2
+      if restaurant.rate_star % 1 == 0:
+        restaurant.rate_star = int(restaurant.rate_star)
+      restaurant.save()
 
     context.update({
       'category_list': category_list,
+      'restaurant_list': restaurant_list,
       'new_restaurant_list': new_restaurant_list,
-      'restaurant_list': zip(self.queryset, average_rate_list, average_rate_star_list),
       })
     
     return context
@@ -69,38 +57,26 @@ class TermsView(generic.TemplateView):
 class RestaurantDetailView(generic.DetailView):
   template_name = "restaurant/restaurant_detail.html"
   model = models.Restaurant
+
   def get_context_data(self, **kwargs):
     user = self.request.user
     pk = self.kwargs['pk']
-    
     context = super(RestaurantDetailView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    
+    if restaurant.rate_star % 1 == 0:
+      average_rate_star = int(restaurant.rate_star)
+    else:
+      average_rate_star = restaurant.rate_star
+
     is_favorite = False
     if user.is_authenticated:
       is_favorite = models.Favorite.objects.filter(customer=user).filter(restaurant=models.Restaurant.objects.get(pk=pk)).exists()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
-
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
-      
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     
     total_seats = models.DiningTable.objects.filter(restaurant=restaurant).aggregate(total=Sum('max_people'))['total'] or 0
-    
-    
+
     context.update({
       'is_favorite': is_favorite,
-      'average_rate': average_rate,
       'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
       'total_seats': total_seats,
       })
     return context
@@ -127,26 +103,18 @@ class RestaurantDetailView(generic.DetailView):
       is_favorite = True
       
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
- 
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
- 
+    if restaurant.rate_star % 1 == 0:
+      average_rate_star = int(restaurant.rate_star)
+    else:
+      average_rate_star = restaurant.rate_star
+
+    total_seats = models.DiningTable.objects.filter(restaurant=restaurant).aggregate(total=Sum('max_people'))['total'] or 0
       
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context = {
       'object': models.Restaurant.objects.get(pk=kwargs['pk']),
       'is_favorite': is_favorite,
-      'average_rate': average_rate,
       'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
+      'total_seats': total_seats,
       }
     return render(request, self.template_name, context)
 
@@ -214,17 +182,18 @@ class RestaurantListView(generic.ListView):
       # else:
       #   restaurant.rate = None
       
-      # 今後これもメニュー登録＆変更時にするようにしたい
-      menus = models.Menu.objects.filter(restaurant=restaurant)
-      if menus.exists():
-        prices = menus.values_list('price', flat=True)
-        restaurant.min_price = min(prices)
-        restaurant.max_price = max(prices)
-      else:
-        restaurant.min_price = None
-        restaurant.max_price = None
+      # メニュー登録＆変更時に実施するため不要になった
+      # menus = models.Menu.objects.filter(restaurant=restaurant)
+      # if menus.exists():
+      #   prices = menus.values_list('price', flat=True)
+      #   restaurant.min_price = min(prices)
+      #   restaurant.max_price = max(prices)
+      # else:
+      #   restaurant.min_price = None
+      #   restaurant.max_price = None
 
-      restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
+      # レビュー登録・削除時に実施するため不要になった
+      # restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
 
       # 本日移行の処理があり、予約時ではなくソート時に実施する必要があるのでview側に残る
       today = date.today()
@@ -421,63 +390,6 @@ class ReservationCreateView(generic.CreateView):
     # 予約が成功したらトップページにリダイレクト
     return redirect(self.success_url)      
 
-  # ガイドからの改修によりコメントアウト
-  #   def form_valid(self, form):
-  #   user_instance = self.request.user
-  #   # GPTのアドバイスにより修正。元の書き方はDB参照ではなくインスタンス生成では？と。
-  #   restaurant_instance = models.Restaurant.objects.get(id=self.kwargs['pk'])
-  #   # restaurant_instance = models.Restaurant(id=self.kwargs['pk'])
-  #   reservation = form.save(commit=False)
-  #   reservation.user = user_instance
-  #   reservation.restaurant = restaurant_instance
-  #   reservation.save()
-  #   return super().form_valid(form)
-    
-  # def form_invalid(self, form):
-  #   return super().form_invalid(form)
-
-    
-  # ガイドからの改修によりコメントアウト、フォームなしで実装にトライ
-  # def get_context_data(self, **kwargs):
-  #   pk = self.kwargs['pk']
-  #   context = super(ReservationCreateView, self).get_context_data(**kwargs)
-  #   restaurant = models.Restaurant.objects.filter(id=pk).first()
-  #   average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-  #   average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-  #   average_rate = round(average_rate, 2)
-  #   if average_rate % 1 == 0:
-  #     average_rate_star = int(average_rate)
-  #   else:
-  #     average_rate_star = round(average_rate * 2) / 2
-      
-  #   rate_count = models.Review.objects.filter(restaurant=restaurant).count()
-  #   close_day_list = self.make_close_list(restaurant.close_day_of_week)
-  #   context.update({
-  #     'restaurant': restaurant,
-  #     'close_day_list': close_day_list,
-  #     'average_rate': average_rate,
-  #     'average_rate_star': average_rate_star,
-  #     'rate_count': rate_count,
-  #     })
-  #   return context
-    
-  # def make_close_list(self, close_day):
-  #   close_list = []
-  #   if '月' in close_day:
-  #     close_list.append(1)
-  #   if '火' in close_day:
-  #     close_list.append(2)
-  #   if '水' in close_day:
-  #     close_list.append(3)
-  #   if '木' in close_day:
-  #     close_list.append(4)
-  #   if '金' in close_day:
-  #     close_list.append(5)
-  #   if '土' in close_day:
-  #     close_list.append(6)
-  #   if '日' in close_day:
-  #     close_list.append(0)
-  #   return close_list
   
 """ 予約一覧表示画面 ================================== """
 class ReservationListView(generic.ListView):
@@ -523,15 +435,6 @@ def reservation_delete(request):
   return JsonResponse({'is_success': is_success})
 
   
-  # if pk:
-  #   try:
-  #     models.Reservation.objects.filter(id=pk).delete()
-  #   except:
-  #     is_success = False
-  # else:
-  #   is_success = False
-  # return JsonResponse({'is_success': is_success})
-  
 """ レビューの一覧表示 ================================== """
 class ReviewListView(generic.ListView):
   template_name = "review/review_list.html"
@@ -552,33 +455,23 @@ class ReviewListView(generic.ListView):
   def get_queryset(self):
     restaurant_id = self.kwargs['pk']
     queryset = super(ReviewListView, self).get_queryset().order_by('-visit_date')
-    return queryset.filter(restaurant=restaurant_id)
+    return queryset.filter(restaurant=restaurant_id, display_masked=0)
 
   def get_context_data(self, **kwargs):
     pk = self.kwargs['pk']
     context = super(ReviewListView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
+    if restaurant.rate_star % 1 == 0:
+      average_rate_star = int(restaurant.rate_star)
+    else:
+      average_rate_star = restaurant.rate_star
+
     is_posted = models.Review.objects.filter(customer=self.request.user).filter(restaurant=restaurant).exists()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
-
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
-
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
 
     context.update({
       'restaurant': restaurant,
       'is_posted': is_posted,
-      'average_rate': average_rate,
       'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
       })
     return context
 
@@ -608,13 +501,18 @@ class ReviewCreateView(generic.CreateView):
 
     # Update the restaurant's rate field
     restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).count()
+    average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
     if average_rate is not None:
         average_rate = round(average_rate, 2)
+        average_rate_star = round(average_rate * 2) / 2
+        if average_rate_star % 1 == 0:
+          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
+        restaurant.rate_star = average_rate_star
     else:
         restaurant.rate = None
+        restaurant.rate_star = None
     restaurant.save()
 
     self.success_url = reverse_lazy('review_list', kwargs={'pk':self.kwargs['pk']})
@@ -628,24 +526,15 @@ class ReviewCreateView(generic.CreateView):
     pk = self.kwargs['pk']
     context = super(ReviewCreateView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
 
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
+    if restaurant.rate_star % 1 == 0:
+      average_rate_star = int(restaurant.rate_star)
+    else:
+      average_rate_star = restaurant.rate_star
 
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
     context.update({
       'restaurant': restaurant,
-      'average_rate': average_rate,
       'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
       })
     return context
 
@@ -660,53 +549,24 @@ class ReviewUpdateView(generic.UpdateView):
     restaurant_id = models.Review.objects.filter(id=pk).first().restaurant.id
     return reverse_lazy('review_list', kwargs={'pk': restaurant_id})
 
-  # def form_valid(self, form):
-  #   return super().form_valid(form)
-
   def form_valid(self, form):
     response = super().form_valid(form)
-    # return response    
-
-    # Get the restaurant associated with the review
-    # Here, we assume the review has a foreign key to restaurant
     restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-    # Calculate the average rating for the restaurant
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
-
-    # Update the restaurant's rate field
+    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).count()
+    average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
     if average_rate is not None:
         average_rate = round(average_rate, 2)
+        average_rate_star = round(average_rate * 2) / 2
+        if average_rate_star % 1 == 0:
+          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
+        restaurant.rate_star = average_rate_star
     else:
         restaurant.rate = None
-
-    # Save the restaurant with the updated rate
+        restaurant.rate_star = None
     restaurant.save()
 
     return response
-  
-  # def form_valid(self, form):
-  #   print(f'hello')
-  #   response = super().form_valid(form)
-  #   print(f'hello')
-  #   return response    
-    # print(f'hello')
-    # response = super().form_valid(form)
-    # print(f'{response}')
-    # # restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-    # # pk = self.kwargs['pk']
-    # # restaurant = models.Restaurant.objects.filter(id=pk)
-    # # restaurant = form.instance.restaurant
-    # restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-    # print(f'{restaurant}')
-    # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
-    # if average_rate is not None:
-    #   average_rate = round(average_rate, 2)
-    #   restaurant.rate = average_rate
-    # else:
-    #   restaurant.rate = None
-    # restaurant.save()
-    # return response    
   
   def form_invalid(self, form):
     return super().form_invalid(form)
@@ -716,28 +576,16 @@ class ReviewUpdateView(generic.UpdateView):
     context = super(ReviewUpdateView, self).get_context_data(**kwargs)
     restaurant_id = models.Review.objects.filter(id=pk).first().restaurant.id
     restaurant = models.Restaurant.objects.filter(id=restaurant_id).first()
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    print(f'{ models.Review.visit_date }konnnitiwa')
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
 
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
+    if restaurant.rate_star % 1 == 0:
+      average_rate_star = int(restaurant.rate_star)
+    else:
+      average_rate_star = restaurant.rate_star
 
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
-    print(f'konnnitiwa')
     context.update({
       'restaurant': restaurant,
-      'average_rate': average_rate,
       'average_rate_star': average_rate_star,
-      'rate_count': rate_count,
-    })
-    
+      })
     return context
 
 """ レビューの削除 ================================== """
@@ -749,21 +597,24 @@ def review_delete(request):
       review = get_object_or_404(models.Review, id=pk)
       restaurant = review.restaurant
       review.delete()
-      # Update the review_num
-      restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
-      # Update the restaurant's rate field
-      average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
+      # Update the restaurant
+      restaurant.review_num = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).count()
+      average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
       if average_rate is not None:
         average_rate = round(average_rate, 2)
+        average_rate_star = round(average_rate * 2) / 2
+        if average_rate_star % 1 == 0:
+          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
+        restaurant.rate_star = average_rate_star
       else:
         restaurant.rate = None
+        restaurant.rate_star = None
       restaurant.save()
     except:
       is_success = False
   else:
     is_success = False
-  
   return JsonResponse({'is_success': is_success})
 
 
@@ -787,6 +638,7 @@ class RestaurantListView2(generic.ListView):
       restaurant.dining_table_count = restaurant.diningtable_set.count()
       restaurant.reservation_count = restaurant.reservation_set.filter(date__gte=today).count()
       restaurant.menu_count = restaurant.menu_set.count()
+      restaurant.replies_count = models.Review.objects.filter(restaurant=restaurant, reply__isnull=True).count()
     return context
 
 """ レストランの作成 ================================== """
@@ -879,6 +731,7 @@ class DiningTableUpdateView(generic.UpdateView):
         context['restaurant'] = get_object_or_404(models.Restaurant, pk=restaurant_id)
         return context
 
+""" ダイニングテーブル作成 ================================== """
 class DiningTableCreateView(generic.CreateView):
     template_name = 'dining_table/dining_table_create.html'
     model = models.DiningTable
@@ -900,3 +753,161 @@ class DiningTableCreateView(generic.CreateView):
         context = super().get_context_data(**kwargs)
         context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
         return context
+
+""" メニュー一覧 ================================== """
+class MenuListView(generic.ListView):
+  template_name = "menu/menu_list.html"
+  model = models.DiningTable
+  paginate_by = 5
+  
+  def get_queryset(self):
+    restaurant_id = self.kwargs.get('restaurant_id')
+    return models.Menu.objects.filter(restaurant_id=restaurant_id)
+
+  def get_context_data(self, **kwargs):
+    context = super().get_context_data(**kwargs)
+    restaurant_id = self.kwargs.get('restaurant_id')
+    context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+    return context
+
+""" メニュー編集 ================================== """
+class MenuUpdateView(generic.UpdateView):
+    model = models.Menu
+    form_class = forms.MenuUpdateForm
+    template_name = 'menu/menu_update.html'
+
+    def get_queryset(self):
+        # Ensure only dining tables for the specified restaurant are allowed
+        restaurant_id = self.kwargs['restaurant_id']
+        return models.Menu.objects.filter(restaurant__id=restaurant_id)
+
+    def get_success_url(self):
+        # Redirect back to the dining table list after updating
+        restaurant_id = self.kwargs['restaurant_id']
+        return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+
+    def get_context_data(self, **kwargs):
+        # Pass the restaurant object to the template
+        context = super().get_context_data(**kwargs)
+        restaurant_id = self.kwargs['restaurant_id']
+        context['restaurant'] = get_object_or_404(models.Restaurant, pk=restaurant_id)
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+        # restaurant = form.instance.restaurant
+        min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
+        max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
+        
+        # 価格情報の更新
+        if min_price is not None:
+            restaurant.min_price = min_price
+        else:
+            restaurant.min_price = None
+        if max_price is not None:
+            restaurant.max_price = max_price
+        else:
+            restaurant.max_price = None
+
+        restaurant.save()
+        return response
+
+""" メニュー作成 ================================== """
+class MenuCreateView(generic.CreateView):
+    template_name = 'menu/menu_create.html'
+    model = models.Menu
+    form_class = forms.MenuCreateForm
+
+    def form_valid(self, form):
+        # Link the table to the correct restaurant using the restaurant_id from the URL
+        restaurant_id = self.kwargs['restaurant_id']
+        form.instance.restaurant = models.Restaurant.objects.get(id=restaurant_id)
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        # Redirect to the list of dining tables for the restaurant after creating the table
+        restaurant_id = self.kwargs['restaurant_id']
+        return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+
+    def get_context_data(self, **kwargs):
+        # Pass the restaurant context to the template
+        context = super().get_context_data(**kwargs)
+        context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
+        return context
+
+
+""" レビューの一覧表示 ================================== """
+class ReviewListView2(generic.ListView):
+    template_name = "review/review_list2.html"
+    model = models.Review
+    ordering = ['-visit_date']
+    paginate_by = 10
+
+    def dispatch(self, request, *args, **kwargs):
+        """Ensure only shop owners (account_type = 2) can access this view."""
+        user = request.user
+        if not user.is_authenticated:
+            return redirect(reverse_lazy('account_login'))
+        if user.account_type != 2:  # Ensure only shop owners can access.
+            return redirect(reverse_lazy('top_page'))  # Redirect if not owner.
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """Filter reviews for the restaurant managed by the shop owner."""
+        restaurant_id = self.kwargs['pk']
+        return (
+            super()
+            .get_queryset()
+            .filter(restaurant_id=restaurant_id)
+            .order_by('-visit_date')  # Ordered by latest first
+        )
+
+    def get_context_data(self, **kwargs):
+        """Add additional context such as restaurant and pending replies."""
+        context = super().get_context_data(**kwargs)
+        pk = self.kwargs['pk']
+        restaurant = models.Restaurant.objects.get(id=pk)
+        
+        # Filter reviews without replies for easier focus
+        pending_replies = models.Review.objects.filter(
+            restaurant=restaurant, reply__isnull=True
+        )
+
+        context.update({
+            'restaurant': restaurant,
+            'pending_replies': pending_replies,
+        })
+        return context
+
+class ReviewUpdateView2(generic.UpdateView):
+    model = models.Review
+    fields = ['reply']
+    template_name = "review/review_update2.html"
+
+    def get_success_url(self):
+        restaurant_id = self.object.restaurant.id
+        return reverse_lazy('review_list2', kwargs={'pk': restaurant_id})
+
+def toggle_display_masked(request, pk):
+    review = get_object_or_404(models.Review, pk=pk)
+    review.display_masked = not review.display_masked
+    review.save()
+
+    # Update the restaurant
+    restaurant = review.restaurant
+    restaurant.review_num = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).count()
+    average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
+    if average_rate is not None:
+      average_rate = round(average_rate, 2)
+      average_rate_star = round(average_rate * 2) / 2
+      if average_rate_star % 1 == 0:
+        average_rate_star = int(average_rate_star)
+      restaurant.rate = average_rate
+      restaurant.rate_star = average_rate_star
+    else:
+      restaurant.rate = None
+      restaurant.rate_star = None
+    restaurant.save()
+
+    return redirect(reverse('review_list2', kwargs={'pk': review.restaurant.id}))

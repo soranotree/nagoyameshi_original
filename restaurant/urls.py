@@ -23,4 +23,10 @@ urlpatterns = [
   path('restaurant/<int:restaurant_id>/dining-tables/', views.DiningTableListView.as_view(), name='dining_table_list'),
   path('restaurant/<int:restaurant_id>/dining-tables/update/<int:pk>/', views.DiningTableUpdateView.as_view(), name='dining_table_update'),
   path('restaurant/<int:restaurant_id>/dining-tables/create/', views.DiningTableCreateView.as_view(), name='dining_table_create'),
-  ]
+  path('restaurant/<int:restaurant_id>/menu/', views.MenuListView.as_view(), name='menu_list'),
+  path('restaurant/<int:restaurant_id>/menu/update/<int:pk>/', views.MenuUpdateView.as_view(), name='menu_update'),
+  path('restaurant/<int:restaurant_id>/menu/create/', views.MenuCreateView.as_view(), name='menu_create'),
+  path('restaurants/<int:pk>/reviews/', views.ReviewListView2.as_view(), name='review_list2'),
+  path('reviews/<int:pk>/edit/', views.ReviewUpdateView2.as_view(), name='review_update2'),
+  path('reviews/<int:pk>/toggle-display/', views.toggle_display_masked, name='toggle_display_masked'),
+    ]

@@ -1,0 +1,88 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% block title %}NAGOYAMESHI{% endblock %}
+{% block content %}
+<main>
+
+  <div class="container nagoyameshi-container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
+        <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' restaurant.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page">メニュー一覧</li>
+          </ol>
+        </nav>
+        <h1 class="mb-3 text-center">メニュー一覧</h1>
+        <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
+
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br>
+        <a href="{% url 'menu_create' restaurant.id %}">新規作成</a>
+
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">名称</th>
+              <th scope="col">説明</th>
+              <th scope="col">値段</th>
+              <th scope="col">提供開始時間</th>
+              <th scope="col">提供終了時間</th>
+              <th scope="col">写真</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for menu in object_list %}
+            <tr>
+              <td>{{ menu.name }}</td>
+              <td>{{ menu.description }}</td>
+              <td class="text-center">{{ menu.price }}円</td>
+              <td class="text-center">{{ menu.available_from }}</td>
+              <td class="text-center">{{ menu.available_end }}</td>
+              <td>未完</td>
+              <td>
+                <button class="btn btn-primary" onclick="location.href='{% url 'menu_update' restaurant_id=restaurant.id pk=menu.pk %}'">編集</button>
+             </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+
+        <!-- ページネーション処理-->
+        {% if is_paginated %}
+        <div class="d-flex justify-content-center">
+          <nav>
+            <ul class="pagination">
+              <!-- 前ページへのリンク-->
+              {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}" rel="prev" aria-label="&laquo; 前">&lsaquo;</a>
+              </li>
+              {% endif %}
+
+              <!-- ページ数表示-->
+              {% for page_num in page_obj.paginator.page_range %}
+              {% if page_obj.number == page_num %}
+              <li class="page-item active" aria-current="page"><span class="page-link">{{ page_num }}</span></li>
+              {% else %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a></li>
+              {% endif %}
+              {% endfor %}
+
+              <!-- 次ページへのリンク-->
+              {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}" rel="next" aria-label="次 &raquo;">&rsaquo;</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}
+{% comment %} {% endblock %} {% endcomment %}
