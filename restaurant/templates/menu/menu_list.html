@@ -9,7 +9,7 @@
       <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
         <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' restaurant.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
             <li class="breadcrumb-item active" aria-current="page">メニュー一覧</li>
           </ol>
         </nav>
@@ -26,8 +26,8 @@
               <th scope="col">名称</th>
               <th scope="col">説明</th>
               <th scope="col">値段</th>
-              <th scope="col">提供開始時間</th>
-              <th scope="col">提供終了時間</th>
+              <th scope="col">受付開始時刻</th>
+              <th scope="col">受付終了時刻</th>
               <th scope="col">写真</th>
               <th scope="col">操作</th>
             </tr>
@@ -43,7 +43,11 @@
               <td>未完</td>
               <td>
                 <button class="btn btn-primary" onclick="location.href='{% url 'menu_update' restaurant_id=restaurant.id pk=menu.pk %}'">編集</button>
-             </td>
+                <form action="{% url 'menu_delete' restaurant_id=restaurant.id pk=menu.pk %}" method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？');">削除</button>
+                </form>
+              </td>
             </tr>
             {% endfor %}
           </tbody>

@@ -1,5 +1,6 @@
 {% extends "layout/base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}nagoyameshi{% endblock %}
 {% block content %}
 <main>
@@ -16,7 +17,7 @@
           </ol>
         </nav>
         <h1 class="mb-2 text-center">{{ restaurant.shop_name }}</h1>
-        <p class="text-center"><span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>{{ restaurant.rate }} （{{ restaurant.review_num }}件）</p>
+        <p class="text-center"><span class="star-rating me-1" data-rate="{{ restaurant.rate|rate_star }}"></span>{{ restaurant.rate }} （{{ restaurant.review_num }}件）</p>
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">
             <a class="nav-link link-dark" href="{% url 'restaurant_detail' restaurant.id %}">トップ</a>

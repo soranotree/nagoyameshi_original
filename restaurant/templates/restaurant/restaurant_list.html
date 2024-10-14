@@ -1,5 +1,7 @@
 {% extends "layout/base.html" %}
 {% load static %}
+{% load humanize %}
+{% load custom_filters %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block content %}
 {% comment %} {% load humanize %} {% endcomment %}
@@ -84,21 +86,20 @@
       </div>
       <div class="col">
         <div class="d-flex justify-content-between flex-wrap">
-{% comment %} view.pyに記載の通り対応済み。ガイドではrestaurant_list.countだが表示不可のため以下に修正 {% endcomment %}
-          <p class="fs-5 mb-3">{{ restaurant_list_count }}件の店舗が見つかりました<span class="fs-6"> </span></p>
+          <p class="fs-5 mb-3">{{ total_restaurant_count }}件の店舗が見つかりました<span class="fs-6"> </span></p>
           <form method="GET" class="mb-3 sort-box">
             <select class="form-select form-select-sm" name="select_sort" aria-label=".form-select-sm example" onChange="this.form.submit();">
               <option value="-created_at" hidden>掲載日が新しい順</option>
               <option value="-created_at" {% if select_sort_session == "-created_at" %}selected{% endif %}>掲載日が新しい順</option>
               <option value="price" {% if select_sort_session == "price" %}selected{% endif %}>価格が安い順</option>
               <option value="-rate" {% if select_sort_session == "-rate" %}selected{% endif %}>評価が高い順</option>
-              <option value="-reservation_num" {% if select_sort_session == "-reservation_num" %}selected{% endif %}>予約数が多い順</option>
+              <option value="-reservation_count" {% if select_sort_session == "-reservation_count" %}selected{% endif %}>予約数が多い順</option>
             </select>
             <input type="hidden" name="button_type" value="select_sort">
           </form>
         </div>
-        {% for restaurant,rate,rate_star in restaurant_list %}
-        {% comment %} {% for restaurant,rate,rate_star,rate_num in restaurant_list %} {% endcomment %}
+        {% for restaurant in page_obj %}
+        {% comment %} {% for restaurant,rate_star in restaurant_list %} {% endcomment %}
         <div class="mb-3">
           <a href="{% url 'restaurant_detail' restaurant.id %}" class="link-dark card-link">
             <div class="card h-100">
@@ -119,17 +120,17 @@
                       電話：{{ restaurant.phone }}</p>
                     <hr class="my-2">
                     <p class="mb-1">
-                      <span class="star-rating me-1" data-rate="{{ rate_star }}"></span>
-                      {{ rate|floatformat:2 }}（{{ restaurant.review_num }}件）
-                      {% comment %} {{ rate|floatformat:2 }}（{{ rate_num }}件） {% endcomment %}
+                      <span class="star-rating me-1" data-rate="{{ restaurant.rate|rate_star }}"></span>
+                      {% comment %} <span class="star-rating me-1" data-rate="{{ rate_star }}"></span> {% endcomment %}
+                      {{ restaurant.rate|floatformat:2 }}（{{ restaurant.review_num }}件）
                     </p>
                     <div class="mb-1">
-                      <span>{{ restaurant.min_price }}円～{{ restaurant.max_price }}円</span>
-                      {% comment %} <span>{{ restaurant.min_price|floatformat:0|intcomma }}円～{{ restaurant.max_price|floatformat:0|intcomma }}円</span> {% endcomment %}
+                      <span>{{ restaurant.min_price|int_with_commas }}円～{{ restaurant.max_price|int_with_commas }}円</span>
+                      {% comment %} <span>{{ restaurant.min_price|int_with_commas }}円～{{ restaurant.max_price|floatformat:0|intcomma }}円</span> {% endcomment %}
                     </div>
                     <p class="card-text">{{ restaurant.description }}</p>
-                    <p class="card-text">★テスト用：掲載日{{ restaurant.created_at }}</p>
-                    <p class="card-text">★テスト用：予約数{{ restaurant.reservation_num }}</p>
+                    <hr class="my-2">
+                    <p class="card-text">{{ restaurant.created_at|date:"Y/m/d" }}掲載　予約{{ restaurant.reservation_count }}件</p>
                   </div>
                 </div>
               </div>
@@ -137,7 +138,37 @@
           </a>
         </div>
         {% endfor %}
-        <div class="d-flex justify-content-center"></div>
+
+        <!-- ページネーション処理-->
+        {% if is_paginated %}
+        <div class="d-flex justify-content-center">
+          <nav>
+            <ul class="pagination">
+              <!-- 前ページへのリンク-->
+              {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.select_sort %}&select_sort={{ request.GET.select_sort }}{% endif %}{% if request.GET.price %}&price={{ request.GET.price }}{% endif %}{% if request.GET.keyword %}&keyword={{ request.GET.keyword }}{% endif %}" rel="prev" aria-label="&laquo; 前">&lsaquo;</a>
+              </li>
+              {% endif %}
+
+              <!-- ページ数表示-->
+              {% for page_num in page_obj.paginator.page_range %}
+              {% if page_obj.number == page_num %}
+              <li class="page-item active" aria-current="page"><span class="page-link">{{ page_num }}</span></li>
+              {% else %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_num }}{% if request.GET.select_sort %}&select_sort={{ request.GET.select_sort }}{% endif %}{% if request.GET.price %}&price={{ request.GET.price }}{% endif %}{% if request.GET.keyword %}&keyword={{ request.GET.keyword }}{% endif %}">{{ page_num }}</a></li>
+              {% endif %}
+              {% endfor %}
+
+              <!-- 次ページへのリンク-->
+              {% if page_obj.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.select_sort %}&select_sort={{ request.GET.select_sort }}{% endif %}{% if request.GET.price %}&price={{ request.GET.price }}{% endif %}{% if request.GET.keyword %}&keyword={{ request.GET.keyword }}{% endif %}" rel="next" aria-label="次 &raquo;">&rsaquo;</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+        
       </div>
     </div>
   </div>

@@ -1,5 +1,6 @@
 {% extends "layout/base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block content %}
 {% load humanize %}
@@ -18,7 +19,7 @@
         </nav>
         <h1 class="mb-2 text-center">{{ object.shop_name }}</h1>
         <p class="text-center">
-          <span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>
+          <span class="star-rating me-1" data-rate="{{ object.rate|rate_star }}"></span>
           {{ object.rate|floatformat:2 }} （{{ object.review_num }}件）
         </p>
         <ul class="nav nav-tabs mb-2">

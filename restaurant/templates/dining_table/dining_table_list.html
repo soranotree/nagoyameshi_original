@@ -4,6 +4,14 @@
 {% block content %}
 <main>
 
+  {% if messages %}
+  <ul class="messages">
+    {% for message in messages %}
+      <li class="{{ message.tags }}">{{ message }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
   <div class="container nagoyameshi-container pb-5">
     <div class="row justify-content-center">
       <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
@@ -39,9 +47,31 @@
               <td class="text-center">{{ table.min_people }}</td>
               <td class="text-center">{{ table.max_people }}</td>
               <td>
-                <button class="btn btn-primary" onclick="location.href='{% url 'dining_table_update' restaurant_id=restaurant.id pk=table.pk %}'">編集</button>
+                <button class="btn btn-primary" 
+                        onclick="location.href='{% url 'dining_table_update' restaurant_id=restaurant.id pk=table.pk %}'">編集
+                </button>
+                <form action="{% url 'dining_table_delete' restaurant_id=restaurant.id pk=table.pk %}" 
+                      method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？');">削除</button>
+                </form>
               </td>
-            </tr>
+
+              {% comment %} <td>
+                <button class="btn btn-primary" onclick="location.href='{% url 'dining_table_update' restaurant_id=restaurant.id pk=table.pk %}'">編集</button>
+                <form action="{% url 'dining_table_delete' restaurant_id=restaurant.id pk=table.pk %}" method="post" style="display:inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？');">削除</button>
+                </form>
+              </td> {% endcomment %}
+              {% comment %} <td>
+                <button class="btn btn-primary" onclick="location.href='{% url 'dining_table_update' restaurant_id=restaurant.id pk=table.pk %}'">編集</button>
+                <form action="{% url 'dining_table_delete' restaurant_id=restaurant.id pk=table.pk %}" method="post" style="display:inline;">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger" onclick="return confirm('本当に削除しますか？');">削除</button>
+                </form>
+                </td> {% endcomment %}
+              </tr>
             {% endfor %}
           </tbody>
         </table>
@@ -81,5 +111,19 @@
     </div>
   </div>
 </main>
+<script>
+  // Check if there are query parameters for messages
+  const urlParams = new URLSearchParams(window.location.search);
+  const message = urlParams.get('message');
+  const messageType = urlParams.get('type');
+
+  if (message) {
+    // Use alert() to display the message
+    alert(message);
+
+    // Optionally, clear query parameters after showing the alert
+    history.replaceState(null, '', window.location.pathname);
+  }
+</script>
 {% endblock %}
 {% comment %} {% endblock %} {% endcomment %}

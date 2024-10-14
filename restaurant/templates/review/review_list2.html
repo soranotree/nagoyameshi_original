@@ -9,7 +9,7 @@
       <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
         <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
-            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' restaurant.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
             <li class="breadcrumb-item active" aria-current="page">レビュー一覧</li>
           </ol>
         </nav>
@@ -23,10 +23,11 @@
         <table class="table">
           <thead>
             <tr>
-              <th scope="col">訪問日</th>
-              <th scope="col">投稿日</th>
-              <th scope="col">評価</th>
-              <th scope="col">顧客名</th>
+              <th scope="col">概要</th>
+              {% comment %} <th scope="col">訪問日</th> {% endcomment %}
+              {% comment %} <th scope="col">投稿日</th> {% endcomment %}
+              {% comment %} <th scope="col">評価</th> {% endcomment %}
+              {% comment %} <th scope="col">顧客名</th> {% endcomment %}
               <th scope="col">コメント</th>
               <th scope="col">返信</th>
               <th scope="col">非表示</th>
@@ -36,18 +37,23 @@
           <tbody>
             {% for review in object_list %}
             <tr>
-              <td>{{ review.visit_date|date:"Y/m/d" }}</td>
-              <td>{{ review.created_at|date:"Y/m/d" }}</td>
-              <td>{{ review.rate }}</td>
-              <td>{{ review.customer.user_name }}</td>
+              <td>
+                訪問日{{ review.visit_date|date:"Y/m/d" }}<br>
+                投稿日{{ review.created_at|date:"Y/m/d" }}<br>
+                評価{{ review.rate }}<br>
+                投稿者{{ review.customer.user_name }}<br>
+                {% comment %} コメント{{ review.comment }} {% endcomment %}
+              </td>
+              {% comment %} <td>{{ review.created_at|date:"Y/m/d" }}</td> {% endcomment %}
+              {% comment %} <td>{{ review.rate }}</td> {% endcomment %}
+              {% comment %} <td>{{ review.customer.user_name }}</td> {% endcomment %}
               <td>{{ review.comment }}</td>
               <td>{{ review.reply|default:"未返信" }}</td>
               <td>
                 {{ review.display_masked|yesno:"非表示,表示" }}
               </td>
               <td>
-                <a href="{% url 'review_update2' review.pk %}" class="btn btn-sm btn-primary">
-                  返信編集
+                <a href="{% url 'review_update2' review.pk %}" class="btn btn-sm btn-primary">返信
                 </a>
                 <form method="post" action="{% url 'toggle_display_masked' review.pk %}" style="display:inline;">
                   {% csrf_token %}

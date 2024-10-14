@@ -1,5 +1,6 @@
 {% extends "layout/base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block stylesheet %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -18,8 +19,8 @@
           </ol>
         </nav>
         <h1 class="mb-2 text-center">{{ restaurant.shop_name }}</h1>
-        <p class="text-center"><span class="star-rating me-1" data-rate="{{ average_rate_star }}"></span>
-          {{ average_rate|floatformat:2 }} （{{ rate_count }}件）
+        <p class="text-center"><span class="star-rating me-1" data-rate="{{ restaurant.rate|rate_star }}"></span>
+          {{ restaurant.rate|floatformat:2 }} （{{ restaurant.review_num }}件）
         </p>
         <ul class="nav nav-tabs mb-3">
           <li class="nav-item">
@@ -79,6 +80,7 @@
           </form>
 
           <!-- 空き座席のテーブル -->
+          <hr class="my-2">
           <h3>空き検索の結果</h3>
 
           <p>予約日：{{ reservation_date }}　時間：{{ reservation_time }}　予約人数：{{ number_of_people }}</p>

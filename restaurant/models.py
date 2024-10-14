@@ -85,7 +85,8 @@ class Reservation(models.Model):
 
   customer = models.ForeignKey(CustomUser, verbose_name='ユーザー会員', on_delete=models.PROTECT, null=True, blank=True)
   restaurant = models.ForeignKey(Restaurant, verbose_name='レストラン', on_delete=models.PROTECT)
-  dining_table = models.ForeignKey(DiningTable, verbose_name='卓情報', on_delete=models.PROTECT, null=True, blank=True)
+  dining_table = models.ForeignKey(DiningTable, verbose_name='卓情報', on_delete=models.SET_NULL, related_name='reservations', null=True, blank=True)
+  # dining_table = models.ForeignKey(DiningTable, verbose_name='卓情報', on_delete=models.PROTECT, related_name='reservations', null=True, blank=True)
   menu = models.ForeignKey(Menu, verbose_name='メニュー', on_delete=models.PROTECT, null=True, blank=True)
   date = models.DateField(verbose_name='予約日')
   time_start = models.TimeField(verbose_name='予約開始時間', choices=TIMES, default='')

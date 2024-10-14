@@ -1,12 +1,18 @@
 from datetime import date, datetime, timedelta
+from django.core.paginator import Paginator
 from django.contrib import messages
 from django.db.models import Avg, Sum, Min, Max
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.db.models import F
+from django.db.models.deletion import ProtectedError
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse_lazy, reverse
-from django.views import generic
+from django.views import generic, View
+from django.http import HttpResponseRedirect
+from urllib.parse import urlencode 
+from django.utils import timezone
+from django.utils.timezone import now
 
 from . import models
 from . import forms
@@ -29,14 +35,9 @@ class TopPageView(generic.ListView):
     
     context = super(TopPageView, self).get_context_data(**kwargs)
     category_list = models.Category.objects.all()
-    restaurant_list = models.Restaurant.objects.order_by('-rate')
-    new_restaurant_list = models.Restaurant.objects.all().order_by('-created_at')
-    
-    for restaurant in restaurant_list:
-      restaurant.rate_star = round(restaurant.rate * 2) / 2
-      if restaurant.rate_star % 1 == 0:
-        restaurant.rate_star = int(restaurant.rate_star)
-      restaurant.save()
+    # 【実験中】高速化のため数を絞っている⇒劇的に早い
+    restaurant_list = models.Restaurant.objects.order_by('-rate')[:18]
+    new_restaurant_list = models.Restaurant.objects.all().order_by('-created_at')[:18]
 
     context.update({
       'category_list': category_list,
@@ -63,10 +64,6 @@ class RestaurantDetailView(generic.DetailView):
     pk = self.kwargs['pk']
     context = super(RestaurantDetailView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    if restaurant.rate_star % 1 == 0:
-      average_rate_star = int(restaurant.rate_star)
-    else:
-      average_rate_star = restaurant.rate_star
 
     is_favorite = False
     if user.is_authenticated:
@@ -76,7 +73,6 @@ class RestaurantDetailView(generic.DetailView):
 
     context.update({
       'is_favorite': is_favorite,
-      'average_rate_star': average_rate_star,
       'total_seats': total_seats,
       })
     return context
@@ -103,167 +99,188 @@ class RestaurantDetailView(generic.DetailView):
       is_favorite = True
       
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    if restaurant.rate_star % 1 == 0:
-      average_rate_star = int(restaurant.rate_star)
-    else:
-      average_rate_star = restaurant.rate_star
 
     total_seats = models.DiningTable.objects.filter(restaurant=restaurant).aggregate(total=Sum('max_people'))['total'] or 0
       
     context = {
       'object': models.Restaurant.objects.get(pk=kwargs['pk']),
       'is_favorite': is_favorite,
-      'average_rate_star': average_rate_star,
       'total_seats': total_seats,
       }
     return render(request, self.template_name, context)
 
 """ レストラン一覧画面 ================================== """
 class RestaurantListView(generic.ListView):
-  template_name = "restaurant_list.html"
-  model = models.Restaurant
-  
-  def get_context_data(self, **kwargs):
-    context = super(RestaurantListView, self).get_context_data(**kwargs)
-    # get input value
-    keyword = self.request.GET.get('keyword')
-    category = self.request.GET.get('category')
-    price = self.request.GET.get('price')
-    select_sort = self.request.GET.get('select_sort')
-    button_type = self.request.GET.get('button_type')
-    keyword = keyword if keyword is not None else ''
-    category = category if category is not None else ''
-    price = price if price is not None else '0'
-    select_sort = select_sort if select_sort is not None else '-created_at'
-    
-    # session control
-    self.request.session['select_sort'] = select_sort
-    
-    if button_type == 'keyword':
-      self.request.session['keyword_session'] = keyword
-      self.request.session['category_session'] = ''
-      self.request.session['price_session'] = '0'
+    template_name = "restaurant_list.html"
+    model = models.Restaurant
+    paginate_by = 5
 
-    if button_type == 'category':
-      self.request.session['category_session'] = category
-      self.request.session['keyword_session'] = ''
-      self.request.session['price_session'] = '0'
+    def get_context_data(self, **kwargs):
+        context = super(RestaurantListView, self).get_context_data(**kwargs)
 
-    if button_type == 'price':
-      self.request.session['price_session'] = price
-      self.request.session['keyword_session'] = ''
-      self.request.session['category_session'] = ''
+        # Get input values and set defaults
+        keyword = self.request.GET.get('keyword', '')
+        category = self.request.GET.get('category', '')
+        price = self.request.GET.get('price', '0')
+        select_sort = self.request.GET.get('select_sort', '-created_at')
+        button_type = self.request.GET.get('button_type')
 
-    if button_type == 'select_sort':
-      self.request.session['select_sort'] = select_sort
-    
-    keyword_session = self.request.session.get('keyword_session')
-    category_session = self.request.session.get('category_session')
-    price_session = self.request.session.get('price_session')
-    select_sort_session = self.request.session.get('select_sort')
-    print(f'select sort session: { select_sort_session }')
+        # Session control
+        if button_type == 'keyword':
+            self.request.session.update({
+                'keyword_session': keyword,
+                'category_session': '',
+                'price_session': '0',
+                'select_sort': select_sort,
+            })
+        elif button_type == 'category':
+            self.request.session.update({
+                'category_session': category,
+                'keyword_session': '',
+                'price_session': '0',
+                'select_sort': select_sort,
+            })
+        elif button_type == 'price':
+            self.request.session.update({
+                'price_session': price,
+                'keyword_session': '',
+                'category_session': '',
+                'select_sort': select_sort,
+            })
+        elif button_type == 'select_sort':
+            self.request.session['select_sort'] = select_sort
 
-    # filtering queryset
-    restaurant_list = models.Restaurant.objects.filter(
-      Q(shop_name__icontains=keyword_session) | Q(address__icontains=keyword_session) | Q(category__name__icontains=keyword_session))
-    restaurant_list = restaurant_list.filter(category__name__icontains=category_session)
-    # print(f'restaurant_list_count: { restaurant_list.count() }')
-    # 予算から探す場合
-    if int(price_session) > 0:
-      restaurant_list = restaurant_list.filter(min_price__lte=price_session, max_price__gte=price_session)
+        # Retrieve session values
+        keyword_session = self.request.session.get('keyword_session', '')
+        category_session = self.request.session.get('category_session', '')
+        price_session = self.request.session.get('price_session', '0')
+        select_sort_session = self.request.session.get('select_sort', '-created_at')
 
-    # DB Update before filtering/ sorting
-    for restaurant in restaurant_list:
-      # Restaurantのrateはレビュー登録・編集・削除時に実施するようにしたので不要になった
-      # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))['rate__avg']
-      # if average_rate is not None:
-      #   average_rate = round(average_rate, 2)
-      #   restaurant.rate = average_rate
-      # else:
-      #   restaurant.rate = None
-      
-      # メニュー登録＆変更時に実施するため不要になった
-      # menus = models.Menu.objects.filter(restaurant=restaurant)
-      # if menus.exists():
-      #   prices = menus.values_list('price', flat=True)
-      #   restaurant.min_price = min(prices)
-      #   restaurant.max_price = max(prices)
-      # else:
-      #   restaurant.min_price = None
-      #   restaurant.max_price = None
+        # Filtering queryset
+        restaurant_list = models.Restaurant.objects.all()
+        restaurant_list = restaurant_list.filter(
+            Q(shop_name__icontains=keyword_session) |
+            Q(address__icontains=keyword_session) |
+            Q(category__name__icontains=keyword_session)
+        )
 
-      # レビュー登録・削除時に実施するため不要になった
-      # restaurant.review_num = models.Review.objects.filter(restaurant=restaurant).count()
+        if category_session:
+            restaurant_list = restaurant_list.filter(category__name__icontains=category_session)
 
-      # 本日移行の処理があり、予約時ではなくソート時に実施する必要があるのでview側に残る
-      today = date.today()
-      restaurant.reservation_num = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False, date__gte=today).count()
+        if int(price_session) > 0:
+            restaurant_list = restaurant_list.filter(min_price__lte=price_session, max_price__gte=price_session)
 
-      restaurant.save()
-    
-    print(f'price session: { price_session }')    # 表示順
-    if select_sort_session == 'price':
-    # if int(price_session) > 0:
-      restaurant_list = restaurant_list.order_by('min_price')
-      print(f'価格でソート')
-      # print(restaurant_list.query)
-    else:
-      restaurant_list = restaurant_list.order_by(select_sort_session)
-      print(f'{ select_sort_session }でソート')
+        # Annotate reservation counts
+        today = date.today()
+        restaurant_list = restaurant_list.annotate(
+            reservation_count=Count(
+                'reservation',
+                filter=Q(
+                    reservation__is_booked=True,
+                    reservation__is_dependent=False,
+                    reservation__date__gte=today
+                )
+            )
+        )
 
-    # print(f'restaurant_list: { restaurant_list }')
-    
-    category_list = models.Category.objects.all()
-    
-    # querysetに含まれるレストランの平均レートを、レストランごとに取得して配列に格納
-    average_rate_list = []
-    average_rate_star_list = []
-    # review_numフィールドをレビュー投稿＆削除の都度更新し不要化。時期が来たら削除してもOK。
-    # rate_num_list = []
-    
-    for restaurant in restaurant_list:
-      # average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-      # print(f'avaratge_rate: { average_rate }')
-      # average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-      # print(f'avaratge_rate: { average_rate }')
-      # average_rate_list.append(round(average_rate, 2))
-      average_rate = restaurant.rate
-      average_rate_list.append(round(average_rate, 2))
-      # print(f'avaratge_rate_list: { len(average_rate_list) }')
-      
-      # rate_starに持っていく際に、整数になるケースは最後にintで整数にしなければならない
-      # そもそも一発目で整数になるケースは超レア⇒最後に整数処理するように修正
-      # if average_rate % 1 == 0:
-      #   average_rate = int(average_rate)
-      # else:
-      #   average_rate = round(average_rate * 2) / 2
-      average_rate = round(average_rate * 2) / 2
-      if average_rate % 1 == 0:
-        average_rate = int(average_rate)
-      
-      average_rate_star_list.append(average_rate)
-      # print(f'avaratge_rate_star_list: { len(average_rate_star_list) }' )
-      
-      # rate_num = models.Review.objects.filter(restaurant=restaurant).count()
-      # rate_num = models.Restaurant.review_num
-      # rate_num_list.append(rate_num)
-      
-# 後述の件数表示不具合対応
-    restaurant_list_count = restaurant_list.count()
-    
-    context.update({
-      'category_list': category_list,
-      'keyword_session': keyword_session,
-      'category_session': category_session,
-      'price_session': price_session,
-      'select_sort_session': select_sort_session,
-      'restaurant_list': zip(restaurant_list, average_rate_list, average_rate_star_list),
-      # 'restaurant_list': zip(restaurant_list, average_rate_list, average_rate_star_list, rate_num_list),
-# 上記のごとくrestaurant_listがzipされるとイテラブルに変換されquerysetでなくなり、テンプレでrestaurant_list.countが使えなくなるとのGPT指摘
-# 以下を改めて追加することとした
-      'restaurant_list_count': restaurant_list_count,
-      })
-    return context
+        # Sorting
+        if select_sort_session == 'price':
+            restaurant_list = restaurant_list.order_by('min_price')
+        else:
+            restaurant_list = restaurant_list.order_by(select_sort_session)
+
+        total_restaurant_count = restaurant_list.count()
+        category_list = models.Category.objects.all()
+
+        # Pagination
+        paginator = Paginator(restaurant_list, self.paginate_by)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context.update({
+            'category_list': category_list,
+            'keyword_session': keyword_session,
+            'category_session': category_session,
+            'price_session': price_session,
+            'select_sort_session': select_sort_session,
+            'total_restaurant_count': total_restaurant_count,
+            'page_obj': page_obj,
+        })
+        return context
+
+
+    # def get_queryset(self):
+    #     # Capture select_sort from the query parameters
+    #     select_sort = self.request.GET.get('select_sort', '-created_at')
+    #     self.request.session['select_sort'] = select_sort
+
+    #     # Retrieve filter parameters from the GET request
+    #     keyword = self.request.GET.get('keyword', '')
+    #     category = self.request.GET.get('category', '')
+    #     price = self.request.GET.get('price', '0')
+
+    #     # Update session with the latest filter values
+    #     self.request.session['keyword_session'] = keyword
+    #     self.request.session['category_session'] = category
+    #     self.request.session['price_session'] = price
+
+    #     today = date.today()
+
+    #     # Start with all restaurants
+    #     queryset = models.Restaurant.objects.all()
+
+    #     # Apply keyword filter if keyword is not empty
+    #     if keyword:
+    #         queryset = queryset.filter(
+    #             Q(shop_name__icontains=keyword) |
+    #             Q(address__icontains=keyword) |
+    #             Q(category__name__icontains=keyword)
+    #         )
+
+    #     # Apply category filter if category is not empty
+    #     if category:
+    #         queryset = queryset.filter(category__name__icontains=category)
+
+    #     # Apply price filter if price is greater than 0
+    #     if int(price) > 0:
+    #         queryset = queryset.filter(min_price__lte=price, max_price__gte=price)
+
+    #     # Annotate reservation counts
+    #     queryset = queryset.annotate(
+    #         reservation_count=Count(
+    #             'reservation',
+    #             filter=Q(
+    #                 reservation__is_booked=True,
+    #                 reservation__is_dependent=False,
+    #                 reservation__date__gte=today
+    #             )
+    #         )
+    #     )
+
+    #     # Apply sorting after filtering
+    #     if select_sort == 'price':
+    #         queryset = queryset.order_by('min_price')
+    #     else:
+    #         queryset = queryset.order_by(select_sort)
+
+    #     return queryset
+
+    # def get_context_data(self, **kwargs):
+    #     context = super().get_context_data(**kwargs)
+
+    #     # Get the filtered queryset for counting total restaurants
+    #     total_restaurant_count = self.get_queryset().count()
+
+    #     context.update({
+    #         'select_sort_session': self.request.session.get('select_sort', '-created_at'),
+    #         'keyword_session': self.request.session.get('keyword_session', ''),
+    #         'category_session': self.request.session.get('category_session', ''),
+    #         'price_session': self.request.session.get('price_session', '0'),
+    #         'category_list': models.Category.objects.all(),
+    #         'total_restaurant_count': total_restaurant_count,
+    #     })
+    #     return context
+
 
 """ お気に入り一覧画面 ================================== """
 class FavoriteListView(generic.ListView):
@@ -274,6 +291,7 @@ class FavoriteListView(generic.ListView):
     queryset = models.Favorite.objects.filter(customer_id=user_id).order_by('-created_at')
     return queryset
 
+""" お気に入り削除機能 ================================== """
 def favorite_delete(request):
   pk = request.GET.get('pk')
   is_success = True
@@ -309,26 +327,6 @@ class ReservationCreateView(generic.CreateView):
     restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['pk'])
     context['restaurant'] = restaurant
     context['hours'] = range(9, 23) # 予約時間リスト作成
-
-    # レート関連
-    average_rate = models.Review.objects.filter(restaurant=restaurant).aggregate(Avg('rate'))
-    average_rate = average_rate['rate__avg'] if average_rate['rate__avg'] is not None else 0
-    average_rate = round(average_rate, 2)
-    # if average_rate % 1 == 0:
-    #   average_rate_star = int(average_rate)
-    # else:
-    #   average_rate_star = round(average_rate * 2) / 2
-
-    average_rate_star = round(average_rate * 2) / 2
-    if average_rate_star % 1 == 0:
-      average_rate_star = int(average_rate)
-
-      
-    rate_count = models.Review.objects.filter(restaurant=restaurant).count()
-    context['average_rate'] = average_rate # コンテキストに追加
-    context['average_rate_star'] = average_rate_star # コンテキストに追加
-    context['rate_count'] = rate_count # コンテキストに追加
-
 
     # 予約条件を取得
     reservation_date = self.request.GET.get('date')  # フロントからの取得
@@ -370,6 +368,7 @@ class ReservationCreateView(generic.CreateView):
   def form_valid(self, form):
     # POSTデータから予約する予約レコードのIDを取得
     reservation_id = self.request.POST.get('reservation_id')
+
     # その予約レコードを取得
     reservation_to_book = get_object_or_404(models.Reservation, id=reservation_id)
     # ログインしているユーザーを取得
@@ -385,11 +384,17 @@ class ReservationCreateView(generic.CreateView):
     else:
       reservation_to_book.menu = models.Menu.objects.get(id=int(menu_id))
     reservation_to_book.save()
-    # 予約成功時の処理（必要に応じて追加）
-    messages.success(self.request, "予約が完了しました。")
-    # 予約が成功したらトップページにリダイレクト
-    return redirect(self.success_url)      
+    # reservation_numの更新
 
+    # 予約数の更新
+    restaurant = reservation_to_book.restaurant
+    booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True).count()
+    restaurant.reservation_num = booked_count
+    restaurant.save()
+
+    messages.success(self.request, "予約が完了しました。")
+
+    return redirect(self.success_url)      
   
 """ 予約一覧表示画面 ================================== """
 class ReservationListView(generic.ListView):
@@ -413,8 +418,7 @@ class ReservationListView(generic.ListView):
 def reservation_delete(request):
   pk = request.GET.get('pk')
   is_success = True
-
-# レコード削除ではなく、is_booked=Falseとcostomer = Noneにするよう変更
+  # レコード削除ではなくis_booked=Falseとcostomer = Noneとし、使いまわす
   if pk:
     try:
       # 該当する予約レコードを取得
@@ -425,6 +429,12 @@ def reservation_delete(request):
       reservation.number_of_people = None  # number_of_peopleをnullにする
       reservation.menu = None  # menuをnullにする
       reservation.save()
+      # 予約数の更新
+      restaurant = reservation.restaurant
+      booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True).count()
+      restaurant.reservation_num = booked_count
+      restaurant.save()
+
     except models.Reservation.DoesNotExist:
       is_success = False
     except Exception as e:
@@ -433,7 +443,6 @@ def reservation_delete(request):
     is_success = False
   
   return JsonResponse({'is_success': is_success})
-
   
 """ レビューの一覧表示 ================================== """
 class ReviewListView(generic.ListView):
@@ -461,17 +470,11 @@ class ReviewListView(generic.ListView):
     pk = self.kwargs['pk']
     context = super(ReviewListView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
-    if restaurant.rate_star % 1 == 0:
-      average_rate_star = int(restaurant.rate_star)
-    else:
-      average_rate_star = restaurant.rate_star
-
     is_posted = models.Review.objects.filter(customer=self.request.user).filter(restaurant=restaurant).exists()
 
     context.update({
       'restaurant': restaurant,
       'is_posted': is_posted,
-      'average_rate_star': average_rate_star,
       })
     return context
 
@@ -505,14 +508,9 @@ class ReviewCreateView(generic.CreateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
     if average_rate is not None:
         average_rate = round(average_rate, 2)
-        average_rate_star = round(average_rate * 2) / 2
-        if average_rate_star % 1 == 0:
-          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
-        restaurant.rate_star = average_rate_star
     else:
         restaurant.rate = None
-        restaurant.rate_star = None
     restaurant.save()
 
     self.success_url = reverse_lazy('review_list', kwargs={'pk':self.kwargs['pk']})
@@ -527,14 +525,8 @@ class ReviewCreateView(generic.CreateView):
     context = super(ReviewCreateView, self).get_context_data(**kwargs)
     restaurant = models.Restaurant.objects.filter(id=pk).first()
 
-    if restaurant.rate_star % 1 == 0:
-      average_rate_star = int(restaurant.rate_star)
-    else:
-      average_rate_star = restaurant.rate_star
-
     context.update({
       'restaurant': restaurant,
-      'average_rate_star': average_rate_star,
       })
     return context
 
@@ -556,14 +548,9 @@ class ReviewUpdateView(generic.UpdateView):
     average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
     if average_rate is not None:
         average_rate = round(average_rate, 2)
-        average_rate_star = round(average_rate * 2) / 2
-        if average_rate_star % 1 == 0:
-          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
-        restaurant.rate_star = average_rate_star
     else:
         restaurant.rate = None
-        restaurant.rate_star = None
     restaurant.save()
 
     return response
@@ -577,14 +564,8 @@ class ReviewUpdateView(generic.UpdateView):
     restaurant_id = models.Review.objects.filter(id=pk).first().restaurant.id
     restaurant = models.Restaurant.objects.filter(id=restaurant_id).first()
 
-    if restaurant.rate_star % 1 == 0:
-      average_rate_star = int(restaurant.rate_star)
-    else:
-      average_rate_star = restaurant.rate_star
-
     context.update({
       'restaurant': restaurant,
-      'average_rate_star': average_rate_star,
       })
     return context
 
@@ -602,14 +583,9 @@ def review_delete(request):
       average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
       if average_rate is not None:
         average_rate = round(average_rate, 2)
-        average_rate_star = round(average_rate * 2) / 2
-        if average_rate_star % 1 == 0:
-          average_rate_star = int(average_rate_star)
         restaurant.rate = average_rate
-        restaurant.rate_star = average_rate_star
       else:
         restaurant.rate = None
-        restaurant.rate_star = None
       restaurant.save()
     except:
       is_success = False
@@ -695,18 +671,38 @@ class RestaurantUpdateView(generic.UpdateView):
 class DiningTableListView(generic.ListView):
   template_name = "dining_table/dining_table_list.html"
   model = models.DiningTable
-  # ordering = ['-created_at']
   paginate_by = 20
-  
+
   def get_queryset(self):
-    restaurant_id = self.kwargs.get('restaurant_id')
+    restaurant_id = self.kwargs['restaurant_id']
     return models.DiningTable.objects.filter(restaurant_id=restaurant_id)
 
   def get_context_data(self, **kwargs):
     context = super().get_context_data(**kwargs)
-    restaurant_id = self.kwargs.get('restaurant_id')
-    context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+    restaurant_id = self.kwargs['restaurant_id']
+        
+    try:
+        context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+    except models.Restaurant.DoesNotExist:
+        context['restaurant'] = None  # Handle gracefully in template
+            
     return context
+
+# class DiningTableListView(generic.ListView):
+#   template_name = "dining_table/dining_table_list.html"
+#   model = models.DiningTable
+#   # ordering = ['-created_at']
+#   paginate_by = 20
+  
+#   def get_queryset(self):
+#     restaurant_id = self.kwargs.get('restaurant_id')
+#     return models.DiningTable.objects.filter(restaurant_id=restaurant_id)
+
+#   def get_context_data(self, **kwargs):
+#     context = super().get_context_data(**kwargs)
+#     restaurant_id = self.kwargs.get('restaurant_id')
+#     context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+#     return context
 
 """ ダイニングテーブル編集 ================================== """
 class DiningTableUpdateView(generic.UpdateView):
@@ -749,10 +745,52 @@ class DiningTableCreateView(generic.CreateView):
         return reverse_lazy('dining_table_list', kwargs={'restaurant_id': restaurant_id})
 
     def get_context_data(self, **kwargs):
-        # Pass the restaurant context to the template
-        context = super().get_context_data(**kwargs)
-        context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
-        return context
+      context = super().get_context_data(**kwargs)
+      restaurant_id = self.kwargs.get('restaurant_id')
+      context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
+      return context
+
+"""ダイニングテーブル削除 ================================== """
+def dining_table_delete(request, restaurant_id, pk):
+    table = get_object_or_404(models.DiningTable, pk=pk)
+
+    if request.method == "POST":
+        # Check if there are any reservations where is_booked=True or not-null
+        existing_reservations = table.reservations.filter(Q(is_booked=True) | Q(is_booked__isnull=False))
+        # existing_reservations = table.reservations.filter(Q(is_booked=True) | Q(is_booked__isnull=False))
+
+        if existing_reservations.exists():
+            # Set error message if deletion is blocked
+            query_string = urlencode({'message': 'このテーブルは予約があるため削除できません。', 'type': 'error'})
+        else:
+            # Delete the table if no booked reservations exist
+            table.delete()
+            query_string = urlencode({'message': 'テーブルを削除しました。', 'type': 'success'})
+
+        # Redirect with the appropriate message
+        return redirect(f"{redirect('dining_table_list', restaurant_id=restaurant_id).url}?{query_string}")
+
+    # Redirect to the list for non-POST requests
+    return redirect('dining_table_list', restaurant_id=restaurant_id)
+
+
+# def dining_table_delete(request, restaurant_id, pk):
+#   table = get_object_or_404(models.DiningTable, pk=pk)
+
+#   if request.method == "POST":
+#     try:
+#       table.delete()
+#       # Redirect to the list with success message
+#       query_string = urlencode({'message': 'テーブルを削除しました。', 'type': 'success'})
+#     except ProtectedError:
+#       # Redirect with error message if deletion fails
+#       query_string = urlencode({'message': 'このテーブルは予約があるため削除できません。', 'type': 'error'})
+        
+#     return redirect(f"{redirect('dining_table_list', restaurant_id=restaurant_id).url}?{query_string}")
+
+#   # For non-POST requests, just redirect
+#   return redirect('dining_table_list', restaurant_id=restaurant_id)
+
 
 """ メニュー一覧 ================================== """
 class MenuListView(generic.ListView):
@@ -772,70 +810,146 @@ class MenuListView(generic.ListView):
 
 """ メニュー編集 ================================== """
 class MenuUpdateView(generic.UpdateView):
-    model = models.Menu
-    form_class = forms.MenuUpdateForm
-    template_name = 'menu/menu_update.html'
+  model = models.Menu
+  form_class = forms.MenuUpdateForm
+  template_name = 'menu/menu_update.html'
 
-    def get_queryset(self):
-        # Ensure only dining tables for the specified restaurant are allowed
-        restaurant_id = self.kwargs['restaurant_id']
-        return models.Menu.objects.filter(restaurant__id=restaurant_id)
+  def get_queryset(self):
+    # Ensure only dining tables for the specified restaurant are allowed
+    restaurant_id = self.kwargs['restaurant_id']
+    return models.Menu.objects.filter(restaurant__id=restaurant_id)
 
-    def get_success_url(self):
-        # Redirect back to the dining table list after updating
-        restaurant_id = self.kwargs['restaurant_id']
-        return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+  def get_success_url(self):
+    # Redirect back to the dining table list after updating
+    restaurant_id = self.kwargs['restaurant_id']
+    return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
 
-    def get_context_data(self, **kwargs):
-        # Pass the restaurant object to the template
-        context = super().get_context_data(**kwargs)
-        restaurant_id = self.kwargs['restaurant_id']
-        context['restaurant'] = get_object_or_404(models.Restaurant, pk=restaurant_id)
-        return context
+  def get_context_data(self, **kwargs):
+    # Pass the restaurant object to the template
+    context = super().get_context_data(**kwargs)
+    restaurant_id = self.kwargs['restaurant_id']
+    context['restaurant'] = get_object_or_404(models.Restaurant, pk=restaurant_id)
+    return context
 
-    def form_valid(self, form):
-        response = super().form_valid(form)
-        restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
-        # restaurant = form.instance.restaurant
-        min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
-        max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
+  def form_valid(self, form):
+    response = super().form_valid(form)
+    restaurant = get_object_or_404(models.Restaurant, id=form.instance.restaurant.id)
+    # restaurant = form.instance.restaurant
+    min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
+    max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
         
-        # 価格情報の更新
-        if min_price is not None:
-            restaurant.min_price = min_price
-        else:
-            restaurant.min_price = None
-        if max_price is not None:
-            restaurant.max_price = max_price
-        else:
-            restaurant.max_price = None
+    # 価格情報の更新
+    if min_price is not None:
+      restaurant.min_price = min_price
+    else:
+      restaurant.min_price = None
+    if max_price is not None:
+      restaurant.max_price = max_price
+    else:
+      restaurant.max_price = None
 
-        restaurant.save()
-        return response
+    restaurant.save()
+    return response
 
 """ メニュー作成 ================================== """
 class MenuCreateView(generic.CreateView):
-    template_name = 'menu/menu_create.html'
-    model = models.Menu
-    form_class = forms.MenuCreateForm
+  template_name = 'menu/menu_create.html'
+  model = models.Menu
+  form_class = forms.MenuCreateForm
 
-    def form_valid(self, form):
-        # Link the table to the correct restaurant using the restaurant_id from the URL
-        restaurant_id = self.kwargs['restaurant_id']
-        form.instance.restaurant = models.Restaurant.objects.get(id=restaurant_id)
-        return super().form_valid(form)
 
-    def get_success_url(self):
-        # Redirect to the list of dining tables for the restaurant after creating the table
-        restaurant_id = self.kwargs['restaurant_id']
-        return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+  # def form_valid(self, form):
+  #   # Link the table to the correct restaurant using the restaurant_id from the URL
+  #   restaurant_id = self.kwargs['restaurant_id']
+  #   form.instance.restaurant = models.Restaurant.objects.get(id=restaurant_id)
+  #   return super().form_valid(form)
 
-    def get_context_data(self, **kwargs):
-        # Pass the restaurant context to the template
-        context = super().get_context_data(**kwargs)
-        context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
-        return context
+  def form_valid(self, form):
+    restaurant_id = self.kwargs['restaurant_id']
+    restaurant = get_object_or_404(models.Restaurant, id=restaurant_id)
+    form.instance.restaurant = restaurant
+    
+    # Call the parent class's form_valid method to save the menu
+    response = super().form_valid(form)
+    
+    # Update the min_price and max_price after the menu is created
+    min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
+    max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
+    
+    # Update the restaurant's price information
+    restaurant.min_price = min_price if min_price is not None else None
+    restaurant.max_price = max_price if max_price is not None else None
+    restaurant.save()
 
+    return response
+
+  def get_success_url(self):
+    # Redirect to the list of dining tables for the restaurant after creating the table
+    restaurant_id = self.kwargs['restaurant_id']
+    return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+
+  def get_context_data(self, **kwargs):
+    # Pass the restaurant context to the template
+    context = super().get_context_data(**kwargs)
+    context['restaurant'] = models.Restaurant.objects.get(id=self.kwargs['restaurant_id'])
+    return context
+
+""" メニュー削除 ================================== """
+class MenuDeleteView(generic.DeleteView):
+  model = models.Menu
+  context_object_name = 'menu'
+
+  def get_success_url(self):
+    # Redirect to the list of menus for the restaurant after deletion
+    restaurant_id = self.object.restaurant.id  # Get the restaurant ID from the object being deleted
+    return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+
+  def form_valid(self, form):
+    # First, delete the menu item
+    response = super().form_valid(form)
+
+    # Update the min_price and max_price of the restaurant
+    restaurant = self.object.restaurant  # Get the associated restaurant
+    min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
+    max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
+    restaurant.min_price = min_price if min_price is not None else None
+    restaurant.max_price = max_price if max_price is not None else None
+    restaurant.save()
+
+    return response
+
+  def delete(self, request, *args, **kwargs):
+    # Call the super delete method to perform the deletion
+    self.object = self.get_object()
+    return super().delete(request, *args, **kwargs)
+# class MenuDeleteView(generic.DeleteView):
+#   model = models.Menu
+#   template_name = 'menu/menu_delete.html'
+#   context_object_name = 'menu'
+
+#   def get_success_url(self):
+#     # Redirect to the list of menus for the restaurant after deletion
+#     restaurant_id = self.object.restaurant.id  # Get the restaurant ID from the object being deleted
+#     return reverse_lazy('menu_list', kwargs={'restaurant_id': restaurant_id})
+
+#   def form_valid(self, form):
+#    # First, delete the menu item
+#     response = super().form_valid(form)
+
+#     # Update the min_price and max_price of the restaurant
+#     restaurant = self.object.restaurant  # Get the associated restaurant
+#     min_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Min('price'))['price__min']
+#     max_price = models.Menu.objects.filter(restaurant=restaurant).aggregate(Max('price'))['price__max']
+#     restaurant.min_price = min_price if min_price is not None else None
+#     restaurant.max_price = max_price if max_price is not None else None
+#     restaurant.save()
+
+#     return response
+
+#   def delete(self, request, *args, **kwargs):
+#     # Call the super delete method to perform the deletion
+#     self.object = self.get_object()
+#     return super().delete(request, *args, **kwargs)
 
 """ レビューの一覧表示 ================================== """
 class ReviewListView2(generic.ListView):
@@ -880,6 +994,7 @@ class ReviewListView2(generic.ListView):
         })
         return context
 
+""" レビューの返信 ================================== """
 class ReviewUpdateView2(generic.UpdateView):
     model = models.Review
     fields = ['reply']
@@ -889,6 +1004,7 @@ class ReviewUpdateView2(generic.UpdateView):
         restaurant_id = self.object.restaurant.id
         return reverse_lazy('review_list2', kwargs={'pk': restaurant_id})
 
+""" 誹謗中傷レビューの非表示対応 ================================== """
 def toggle_display_masked(request, pk):
     review = get_object_or_404(models.Review, pk=pk)
     review.display_masked = not review.display_masked
@@ -900,14 +1016,101 @@ def toggle_display_masked(request, pk):
     average_rate = models.Review.objects.filter(restaurant=restaurant, display_masked = 0).aggregate(Avg('rate'))['rate__avg']
     if average_rate is not None:
       average_rate = round(average_rate, 2)
-      average_rate_star = round(average_rate * 2) / 2
-      if average_rate_star % 1 == 0:
-        average_rate_star = int(average_rate_star)
       restaurant.rate = average_rate
-      restaurant.rate_star = average_rate_star
     else:
       restaurant.rate = None
-      restaurant.rate_star = None
     restaurant.save()
 
     return redirect(reverse('review_list2', kwargs={'pk': review.restaurant.id}))
+
+""" 予約管理 ================================== """
+class ReservationManagementView(View):
+    template_name = 'reservation/reservation_management.html'
+
+    def get(self, request, restaurant_id):
+        selected_restaurant = get_object_or_404(models.Restaurant, pk=restaurant_id)
+        dining_tables = models.DiningTable.objects.filter(restaurant=selected_restaurant)
+
+        # Retrieve selected dining table and date
+        selected_table_id = request.GET.get('dining_table')
+        selected_table = models.DiningTable.objects.filter(id=selected_table_id).first()
+
+        selected_date_str = request.GET.get('selected_date')
+        selected_date = (
+            datetime.strptime(selected_date_str, "%Y-%m-%d").date()
+            if selected_date_str else now().date()
+        )
+
+        # Calculate start and end of the selected week
+        start_of_week = selected_date - timedelta(days=selected_date.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+
+        # Calculate previous, current, and next week dates
+        previous_week_date = start_of_week - timedelta(days=7)
+        next_week_date = start_of_week + timedelta(days=7)
+        current_week_date = now().date()
+
+        time_slots = [
+          ("09:00", "9:00 AM"), 
+          ("09:30", "9:30 AM"), 
+          ("10:00", "10:00 AM"), 
+          ("10:30", "10:30 AM"), 
+          ("11:00", "11:00 AM"), 
+          ("11:30", "11:30 AM"), 
+          ("12:00", "12:00 PM"), 
+          ("12:30", "12:30 PM"),
+          ("13:00", "1:00 PM"), 
+          ("13:30", "1:30 PM"),
+          ("14:00", "2:00 PM"), 
+          ("14:30", "2:30 PM"),
+          ("15:00", "3:00 PM"), 
+          ("15:30", "3:30 PM"),
+          ("16:00", "4:00 PM"), 
+          ("16:30", "4:30 PM"),
+          ("17:00", "5:00 PM"), 
+          ("17:30", "5:30 PM"),
+          ("18:00", "6:00 PM"), 
+          ("18:30", "6:30 PM"),
+          ("19:00", "7:00 PM"), 
+          ("19:30", "7:30 PM"),
+          ("20:00", "8:00 PM"), 
+          ("20:30", "8:30 PM"),
+          ("21:00", "9:00 PM"), 
+          ("21:30", "9:30 PM"),
+          ("22:00", "10:00 PM"), 
+          ("22:30", "10:30 PM"),
+          ]
+        # Prepare reservation data
+        reservation_data = {
+            date: {slot[0]: None for slot in time_slots}
+            for date in (start_of_week + timedelta(days=i) for i in range(7))
+        }
+
+        if selected_table:
+            reservations = models.Reservation.objects.filter(
+                dining_table=selected_table,
+                date__range=[start_of_week, end_of_week]
+            )
+            for res in reservations:
+                reservation_data[res.date][res.time_start] = res
+
+        print("Reservation Data:", reservation_data)  # Check the structure and contents
+
+        context = {
+            'selected_restaurant': selected_restaurant,
+            'dining_tables': dining_tables,
+            'selected_table': selected_table,
+            'selected_date': selected_date,
+            'reservation_data': reservation_data,
+            'start_of_week': start_of_week,
+            'end_of_week': end_of_week,
+            'previous_week_date': previous_week_date,
+            'next_week_date': next_week_date,
+            'current_week_date': current_week_date,
+            'time_slots': time_slots,
+        }
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        # Handle any form submissions if needed
+        return redirect('reservation_management')

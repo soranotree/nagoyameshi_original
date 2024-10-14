@@ -42,7 +42,11 @@
               </td>
               <td>{{ restaurant.owner_name }}</td>
               <td>{{ restaurant.address }}</td>
-              <td>{{ restaurant.reservation_count }}個</td>
+              <td>
+                <a href="{% url 'reservation_management' restaurant.id %}">
+                  {{ restaurant.reservation_count }}個
+                </a>
+              </td>
               <td>
                 <a href="{% url 'menu_list' restaurant.id %}">
                   {{ restaurant.menu_count }}件
@@ -55,7 +59,7 @@
               </td>
               <td>
                 <a href="{% url 'review_list2' restaurant.id %}">
-                  未返信{{ restaurant.replies_count }}件／全{{ restaurant.review_num }}件
+                  未返信{{ restaurant.replies_count }}件／表示中{{ restaurant.review_num }}件
                 </a>
               </td>
 
