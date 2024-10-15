@@ -1024,93 +1024,164 @@ def toggle_display_masked(request, pk):
     return redirect(reverse('review_list2', kwargs={'pk': review.restaurant.id}))
 
 """ 予約管理 ================================== """
-class ReservationManagementView(View):
+class ReservationManagementView(generic.ListView):
+    model = models.Reservation
     template_name = 'reservation/reservation_management.html'
+    context_object_name = 'reservations'
+    paginate_by = 10
 
-    def get(self, request, restaurant_id):
-        selected_restaurant = get_object_or_404(models.Restaurant, pk=restaurant_id)
-        dining_tables = models.DiningTable.objects.filter(restaurant=selected_restaurant)
+    def get_queryset(self):
+        restaurant_id = self.kwargs['restaurant_id']
+        restaurant = get_object_or_404(models.Restaurant, id=restaurant_id)
+        queryset = models.Reservation.objects.filter(
+            restaurant=restaurant,
+            is_booked=True,
+            is_dependent=False
+        ).select_related('menu', 'dining_table')
 
-        # Retrieve selected dining table and date
-        selected_table_id = request.GET.get('dining_table')
-        selected_table = models.DiningTable.objects.filter(id=selected_table_id).first()
+        # Date range filtering
+        from_date = self.request.GET.get('from_date')
+        to_date = self.request.GET.get('to_date')
 
-        selected_date_str = request.GET.get('selected_date')
-        selected_date = (
-            datetime.strptime(selected_date_str, "%Y-%m-%d").date()
-            if selected_date_str else now().date()
-        )
+        if from_date:
+            queryset = queryset.filter(date__gte=from_date)
 
-        # Calculate start and end of the selected week
-        start_of_week = selected_date - timedelta(days=selected_date.weekday())
-        end_of_week = start_of_week + timedelta(days=6)
+        if to_date:
+            queryset = queryset.filter(date__lte=to_date)
 
-        # Calculate previous, current, and next week dates
-        previous_week_date = start_of_week - timedelta(days=7)
-        next_week_date = start_of_week + timedelta(days=7)
-        current_week_date = now().date()
+        # Sorting functionality
+        order_by = self.request.GET.get('order_by')
+        if order_by:
+            fields = [field.strip() for field in order_by.split(',')]
+            queryset = queryset.order_by(*fields)
 
-        time_slots = [
-          ("09:00", "9:00 AM"), 
-          ("09:30", "9:30 AM"), 
-          ("10:00", "10:00 AM"), 
-          ("10:30", "10:30 AM"), 
-          ("11:00", "11:00 AM"), 
-          ("11:30", "11:30 AM"), 
-          ("12:00", "12:00 PM"), 
-          ("12:30", "12:30 PM"),
-          ("13:00", "1:00 PM"), 
-          ("13:30", "1:30 PM"),
-          ("14:00", "2:00 PM"), 
-          ("14:30", "2:30 PM"),
-          ("15:00", "3:00 PM"), 
-          ("15:30", "3:30 PM"),
-          ("16:00", "4:00 PM"), 
-          ("16:30", "4:30 PM"),
-          ("17:00", "5:00 PM"), 
-          ("17:30", "5:30 PM"),
-          ("18:00", "6:00 PM"), 
-          ("18:30", "6:30 PM"),
-          ("19:00", "7:00 PM"), 
-          ("19:30", "7:30 PM"),
-          ("20:00", "8:00 PM"), 
-          ("20:30", "8:30 PM"),
-          ("21:00", "9:00 PM"), 
-          ("21:30", "9:30 PM"),
-          ("22:00", "10:00 PM"), 
-          ("22:30", "10:30 PM"),
-          ]
-        # Prepare reservation data
-        reservation_data = {
-            date: {slot[0]: None for slot in time_slots}
-            for date in (start_of_week + timedelta(days=i) for i in range(7))
-        }
+        return queryset
 
-        if selected_table:
-            reservations = models.Reservation.objects.filter(
-                dining_table=selected_table,
-                date__range=[start_of_week, end_of_week]
-            )
-            for res in reservations:
-                reservation_data[res.date][res.time_start] = res
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        restaurant_id = self.kwargs['restaurant_id']
+        context['restaurant'] = get_object_or_404(models.Restaurant, id=restaurant_id)
 
-        print("Reservation Data:", reservation_data)  # Check the structure and contents
+        # Get total count of reservations (filtered by the same criteria)
+        total_reservations_count = models.Reservation.objects.filter(
+            restaurant=context['restaurant'],
+            is_booked=True,
+            is_dependent=False
+        ).count()
 
-        context = {
-            'selected_restaurant': selected_restaurant,
-            'dining_tables': dining_tables,
-            'selected_table': selected_table,
-            'selected_date': selected_date,
-            'reservation_data': reservation_data,
-            'start_of_week': start_of_week,
-            'end_of_week': end_of_week,
-            'previous_week_date': previous_week_date,
-            'next_week_date': next_week_date,
-            'current_week_date': current_week_date,
-            'time_slots': time_slots,
-        }
-        return render(request, self.template_name, context)
+        # Apply date range filtering for total count
+        from_date = self.request.GET.get('from_date')
+        to_date = self.request.GET.get('to_date')
 
-    def post(self, request):
-        # Handle any form submissions if needed
-        return redirect('reservation_management')
+        if from_date:
+            total_reservations_count = models.Reservation.objects.filter(
+                restaurant=context['restaurant'],
+                is_booked=True,
+                is_dependent=False,
+                date__gte=from_date
+            ).count()
+
+        if to_date:
+            total_reservations_count = models.Reservation.objects.filter(
+                restaurant=context['restaurant'],
+                is_booked=True,
+                is_dependent=False,
+                date__lte=to_date
+            ).count()
+
+        context['total_reservations_count'] = total_reservations_count
+        return context
+
+
+
+# 一度お休み
+# class ReservationManagementView(View):
+#     template_name = 'reservation/reservation_management.html'
+
+#     def get(self, request, restaurant_id):
+#         selected_restaurant = get_object_or_404(models.Restaurant, pk=restaurant_id)
+#         dining_tables = models.DiningTable.objects.filter(restaurant=selected_restaurant)
+
+#         # Retrieve selected dining table and date
+#         selected_table_id = request.GET.get('dining_table')
+#         selected_table = models.DiningTable.objects.filter(id=selected_table_id).first()
+
+#         selected_date_str = request.GET.get('selected_date')
+#         selected_date = (
+#             datetime.strptime(selected_date_str, "%Y-%m-%d").date()
+#             if selected_date_str else now().date()
+#         )
+
+#         # Calculate start and end of the selected week
+#         start_of_week = selected_date - timedelta(days=selected_date.weekday())
+#         end_of_week = start_of_week + timedelta(days=6)
+
+#         # Calculate previous, current, and next week dates
+#         previous_week_date = start_of_week - timedelta(days=7)
+#         next_week_date = start_of_week + timedelta(days=7)
+#         current_week_date = now().date()
+
+#         time_slots = [
+#           ("09:00", "9:00 AM"), 
+#           ("09:30", "9:30 AM"), 
+#           ("10:00", "10:00 AM"), 
+#           ("10:30", "10:30 AM"), 
+#           ("11:00", "11:00 AM"), 
+#           ("11:30", "11:30 AM"), 
+#           ("12:00", "12:00 PM"), 
+#           ("12:30", "12:30 PM"),
+#           ("13:00", "1:00 PM"), 
+#           ("13:30", "1:30 PM"),
+#           ("14:00", "2:00 PM"), 
+#           ("14:30", "2:30 PM"),
+#           ("15:00", "3:00 PM"), 
+#           ("15:30", "3:30 PM"),
+#           ("16:00", "4:00 PM"), 
+#           ("16:30", "4:30 PM"),
+#           ("17:00", "5:00 PM"), 
+#           ("17:30", "5:30 PM"),
+#           ("18:00", "6:00 PM"), 
+#           ("18:30", "6:30 PM"),
+#           ("19:00", "7:00 PM"), 
+#           ("19:30", "7:30 PM"),
+#           ("20:00", "8:00 PM"), 
+#           ("20:30", "8:30 PM"),
+#           ("21:00", "9:00 PM"), 
+#           ("21:30", "9:30 PM"),
+#           ("22:00", "10:00 PM"), 
+#           ("22:30", "10:30 PM"),
+#           ]
+#         # Prepare reservation data
+#         reservation_data = {
+#             date: {slot[0]: None for slot in time_slots}
+#             for date in (start_of_week + timedelta(days=i) for i in range(7))
+#         }
+
+#         if selected_table:
+#             reservations = models.Reservation.objects.filter(
+#                 dining_table=selected_table,
+#                 date__range=[start_of_week, end_of_week]
+#             )
+#             for res in reservations:
+#                 reservation_data[res.date][res.time_start] = res
+
+#         print("Reservation Data:", reservation_data)  # Check the structure and contents
+
+#         context = {
+#             'selected_restaurant': selected_restaurant,
+#             'dining_tables': dining_tables,
+#             'selected_table': selected_table,
+#             'selected_date': selected_date,
+#             'reservation_data': reservation_data,
+#             'start_of_week': start_of_week,
+#             'end_of_week': end_of_week,
+#             'previous_week_date': previous_week_date,
+#             'next_week_date': next_week_date,
+#             'current_week_date': current_week_date,
+#             'time_slots': time_slots,
+#         }
+#         return render(request, self.template_name, context)
+
+#     def post(self, request):
+#         # Handle any form submissions if needed
+#         return redirect('reservation_management')

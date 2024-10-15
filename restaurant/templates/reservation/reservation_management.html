@@ -10,7 +10,7 @@
         <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
-            <li class="breadcrumb-item active" aria-current="page">ダイニングテーブル一覧</li>
+            <li class="breadcrumb-item active" aria-current="page">予約管理</li>
           </ol>
         </nav>
 
@@ -24,116 +24,125 @@
   
 
         <h1 class="mb-3 text-center">予約管理</h1>
-        <h2 class="mb-3 text-center">{{ selected_restaurant.shop_name }}</h2>
-        {% comment %} <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2> {% endcomment %}
-        {% comment %} <a href="{% url 'dining_table_create' %}">ダイニングテーブルの追加</a> {% endcomment %}
-        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <h2 class="mb-3 text-center">{{ restaurant.shop_name }}</h2>
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a><br>
         <br>
         {% comment %} <a href="{% url 'dining_table_create' restaurant.id %}">新規作成</a> {% endcomment %}
 
-        <form method="GET" action="{% url 'reservation_management' selected_restaurant.id %}">
-          <label for="dining_table">Dining Table:</label>
-          <select name="dining_table" id="dining_table">
-              {% for table in dining_tables %}
-                  <option value="{{ table.id }}" {% if selected_table and table.id == selected_table.id %}selected{% endif %}>
-                      {{ table.name_for_customer }}
-                  </option>
-              {% endfor %}
-          </select>
-      
-          <label for="selected_date">Select Date:</label>
-          <input type="date" id="selected_date" name="selected_date" value="{{ selected_date|date:'Y-m-d' }}">
-      
-          <button type="submit">Search</button>
-      </form>
-      
-      <!-- Week Navigation Buttons -->
-      <div class="week-navigation">
-          <form method="GET" action="{% url 'reservation_management' selected_restaurant.id %}">
-              <input type="hidden" name="selected_date" value="{{ previous_week_date|date:'Y-m-d' }}">
-              <button type="submit">Previous Week</button>
-          </form>
-      
-          <form method="GET" action="{% url 'reservation_management' selected_restaurant.id %}">
-              <input type="hidden" name="selected_date" value="{{ current_week_date|date:'Y-m-d' }}">
-              <button type="submit">This Week</button>
-          </form>
-      
-          <form method="GET" action="{% url 'reservation_management' selected_restaurant.id %}">
-              <input type="hidden" name="selected_date" value="{{ next_week_date|date:'Y-m-d' }}">
-              <button type="submit">Next Week</button>
-          </form>
-      </div>
+        <form method="get" class="mb-3">
+          <div class="row">
+            <div class="col-md-4">
+              <label for="from_date" class="form-label">開始日</label>
+              <input type="date" name="from_date" id="from_date" class="form-control" value="{{ request.GET.from_date }}">
+            </div>
+            <div class="col-md-4">
+              <label for="to_date" class="form-label">終了日</label>
+              <input type="date" name="to_date" id="to_date" class="form-control" value="{{ request.GET.to_date }}">
+            </div>
+            <div class="col-md-4">
+              <label for="order_by" class="form-label">ソート順</label>
+              <select name="order_by" id="order_by" class="form-control">
+                <option value="">ソート順を選択</option>
+                <option value="date,time_start" {% if request.GET.order_by == "date,time_start" %}selected{% endif %}>予約日時（古→新）</option>
+                <option value="-date,-time_start" {% if request.GET.order_by == "-date,-time_start" %}selected{% endif %}>予約日時（新→古）</option>
+                <option value="number_of_people" {% if request.GET.order_by == "number_of_people" %}selected{% endif %}>人数（少→多）</option>
+                <option value="-number_of_people" {% if request.GET.order_by == "-number_of_people" %}selected{% endif %}>人数（多→少）</option>
+                <option value="menu" {% if request.GET.order_by == "menu" %}selected{% endif %}>メニュー</option>
+                <option value="dining_table" {% if request.GET.order_by == "dining_table" %}selected{% endif %}>テーブル</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-primary">適用する</button>
+            </div>
+          </div>
+        </form>
 
+        <div class="mb-3">
+          {% if reservations %}
+              {{ total_reservations_count }}件の予約があります。
+          {% else %}
+              条件に合う予約はありません。
+          {% endif %}
+        </div>
 
-      <table>
-        <thead>
+        <table class="table">
+          <thead>
             <tr>
-                <th>Time Slot</th>
-                {% for date in start_of_week|get_days_until:end_of_week %}
-                    <th>{{ date|date:"Y-m-d" }}</th>
-                {% endfor %}
+              <th scope="col">ユーザー名</th>
+              <th scope="col">予約日</th>
+              <th scope="col">時間</th>
+              <th scope="col">人数</th>
+              <th scope="col">制限時間</th>
+              <th scope="col">メニュー</th>
+              <th scope="col">テーブル名（内部管理用）</th>
+              <th scope="col">テーブル名（HP掲載用）</th>
             </tr>
-        </thead>
-        <tbody>
-            {% for time_key in time_slots %}
+          </thead>
+          <tbody>
+            {% for reservation in reservations %}
             <tr>
-                <td>{{ time_key.1 }}</td> <!-- Display time slot -->
-                {% for date in start_of_week|get_days_until:end_of_week %}
-                    {% with reservation=reservation_data|get_item:date|get_item:time_key.0 %}
-                        <td class="{% if reservation and reservation.is_booked %}booked{% elif reservation %}available{% else %}empty{% endif %}">
-                            {% if reservation %}
-                                {% if reservation.is_booked %}
-                                    Booked <!-- Display "Booked" if is_booked is True -->
-                                {% else %}
-                                    {{ reservation.duration_min }} <!-- Display duration_min if is_booked is False -->
-                                {% endif %}
-                            {% else %}
-                                No Reservations <!-- Display message if no reservation exists -->
-                            {% endif %}
-                        </td>
-                    {% endwith %}
-                {% endfor %}
+              <td>{{ reservation.customer.user_name }}</td>
+              <td>{{ reservation.date }}</td>
+              <td>{{ reservation.time_start }}</td>
+              <td>{{ reservation.number_of_people }}</td>
+              <td>{{ reservation.duration_min }}分</td>
+              <td>{{ reservation.menu.name }}</td>
+              <td>{{ reservation.dining_table.name_for_internal }}</td>
+              <td>{{ reservation.dining_table.name_for_customer }}</td>
             </tr>
             {% endfor %}
-        </tbody>
-    </table>
-    
-      {% comment %} <table>
-        <thead>
-          <tr>
-            <th>Time Slot</th>
-            {% for date in start_of_week|get_days_until:end_of_week %}
-              <th>{{ date|date:"Y-m-d" }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for time_key in time_slots %}
-          <tr>
-              <td>{{ time_key.1 }}</td> <!-- Display time slot -->
-              {% for date in start_of_week|get_days_until:end_of_week %}
-                  {% with reservation=reservation_data|get_item:date|get_item:time_key.0 %}
-                      <td class="{% if reservation and reservation.is_booked %}booked{% elif reservation %}available{% else %}empty{% endif %}">
-                          {% if reservation %}
-                              {% if reservation.is_booked %}
-                                  booked <!-- Display "booked" if is_booked is True -->
-                              {% else %}
-                                  {{ reservation.duration_min }} <!-- Display duration_min if is_booked is False -->
-                              {% endif %}
-                          {% else %}
-                              - <!-- Display "-" if no reservation exists -->
-                          {% endif %}
-                      </td>
-                  {% endwith %}
-              {% endfor %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table> {% endcomment %}
-      
-      
+          </tbody>
+        </table>
+
         <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+
+<!-- ページネーション処理 -->
+{% if is_paginated %}
+<div class="d-flex justify-content-center">
+  <nav>
+    <ul class="pagination">
+      <!-- 前ページへのリンク -->
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" 
+           href="?page={{ page_obj.previous_page_number }}{% if request.GET.order_by %}&order_by={{ request.GET.order_by }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}" 
+           rel="prev" aria-label="&laquo; 前">&lsaquo;</a>
+      </li>
+      {% endif %}
+
+      <!-- ページ数表示 -->
+      {% for page_num in page_obj.paginator.page_range %}
+      {% if page_obj.number == page_num %}
+      <li class="page-item active" aria-current="page">
+        <span class="page-link">{{ page_num }}</span>
+      </li>
+      {% else %}
+      <li class="page-item">
+        <a class="page-link" 
+           href="?page={{ page_num }}{% if request.GET.order_by %}&order_by={{ request.GET.order_by }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}">
+          {{ page_num }}
+        </a>
+      </li>
+      {% endif %}
+      {% endfor %}
+
+      <!-- 次ページへのリンク -->
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" 
+           href="?page={{ page_obj.next_page_number }}{% if request.GET.order_by %}&order_by={{ request.GET.order_by }}{% endif %}{% if request.GET.from_date %}&from_date={{ request.GET.from_date }}{% endif %}{% if request.GET.to_date %}&to_date={{ request.GET.to_date }}{% endif %}" 
+           rel="next" aria-label="次 &raquo;">&rsaquo;</a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+{% endif %}
+
+
+
+
+
       </div>
     </div>
   </div>
