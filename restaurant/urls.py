@@ -33,7 +33,7 @@ urlpatterns = [
   path('restaurants/<int:pk>/reviews/', views.ReviewListView2.as_view(), name='review_list2'),
   path('reviews/<int:pk>/edit/', views.ReviewUpdateView2.as_view(), name='review_update2'),
   path('reviews/<int:pk>/toggle-display/', views.toggle_display_masked, name='toggle_display_masked'),
-  path('restaurant/<int:restaurant_id>/reservation/', views.ReservationManagementView.as_view(), name='reservation_management'),
-  # path('restaurants/reservation/reservation-management/<int:restaurant_id>/', views.ReservationManagementView.as_view(), name='reservation_management'),
-  # path('reservation-management/', views.ReservationManagementView.as_view(), name='reservation_management'),
+  path('restaurant/<int:restaurant_id>/reservations', views.ReservationListView2.as_view(), name='reservation_list2'),
+  path('restaurant/<int:restaurant_id>/reservations/reservation-management', views.ReservationManagementView.as_view(), name='reservation_management'),
+  path('restaurant/<int:restaurant_id>/reservations/reservation-slots/', views.ReservationSlotCreateView.as_view(), name='reservation_slot_create'),
   ]

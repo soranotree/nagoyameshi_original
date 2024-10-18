@@ -91,7 +91,7 @@ class Reservation(models.Model):
   date = models.DateField(verbose_name='予約日')
   time_start = models.TimeField(verbose_name='予約開始時間', choices=TIMES, default='')
   duration_min = models.IntegerField(verbose_name='制限時間（分）', null=True, blank=True)  # 制限時間（分、整数値）
-  number_of_people = models.IntegerField(verbose_name='人数', choices=NUMBER_OF_PEOPLE, default='', null=True, blank=True)
+  number_of_people = models.IntegerField(verbose_name='人数', choices=NUMBER_OF_PEOPLE, default=None, null=True, blank=True)
   is_booked = models.BooleanField(verbose_name='予約済みフラグ', default='0')
   is_dependent = models.BooleanField(verbose_name='枠依存用予約フラグ', default='0')
   created_at = models.DateTimeField(verbose_name='予約受付日時', auto_now_add=True)

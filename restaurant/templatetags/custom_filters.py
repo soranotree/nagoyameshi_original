@@ -32,3 +32,13 @@ def date_add(date_obj, days):
 @register.filter
 def get_item(dictionary, key):
     return dictionary.get(key, None)
+
+@register.filter
+def get_reservation(reservations, date_time):
+    date, time = date_time.split()
+    date = date.strip()
+    time = time.strip()
+    for reservation in reservations:
+        if str(reservation.date) == date and str(reservation.time_start) == time:
+            return reservation
+    return None

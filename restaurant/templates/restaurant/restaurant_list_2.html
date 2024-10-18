@@ -1,5 +1,6 @@
 {% extends "layout/base.html" %}
 {% load static %}
+{% load custom_filters %}
 {% block title %}NAGOYAMESHI{% endblock %}
 {% block content %}
 {% comment %} {% load humanize %} {% endcomment %}
@@ -19,15 +20,14 @@
         <table class="table">
           <thead>
             <tr>
-              <th scope="col">店舗名</th>
-              <th scope="col">店長名</th>
-              {% comment %} <th scope="col">郵便番号</th> {% endcomment %}
-              <th scope="col">住所</th>
-              <th scope="col">予約枠</th>
-              <th scope="col">メニュー</th>
-              <th scope="col">テーブル</th>
-              <th scope="col">レビュー</th>
-              <th scope="col">操作</th>
+              <th scope="col">店舗概要</th>
+              {% comment %} <th scope="col">店長</th> {% endcomment %}
+              {% comment %} <th scope="col">住所</th> {% endcomment %}
+              <th scope="col" class="text-center">予約</th>
+              <th scope="col" class="text-center">メニュー</th>
+              <th scope="col" class="text-center">テーブル</th>
+              <th scope="col" class="text-center">レビュー</th>
+              {% comment %} <th scope="col">操作</th> {% endcomment %}
             </tr>
           </thead>
           <tbody>
@@ -38,34 +38,44 @@
                   <a href="{% url 'restaurant_detail' restaurant.id %}">
                     {{ restaurant.shop_name }}
                   </a>
-                  {% comment %} </a> {% endcomment %}
+                  <br>
+                  店長：{{ restaurant.owner_name }}<br>
+                  住所：{{ restaurant.address }}<br>
+                  <a>
+                  <button class="btn btn-secondary" onclick="location.href='{% url 'restaurant_update' pk=restaurant.pk %}'">編集</button>
+                  </a>
               </td>
-              <td>{{ restaurant.owner_name }}</td>
-              <td>{{ restaurant.address }}</td>
-              <td>
-                <a href="{% url 'reservation_management' restaurant.id %}">
-                  {{ restaurant.reservation_count }}個
+              {% comment %} <td>{{ restaurant.address }}</td> {% endcomment %}
+              <td  class="text-center">
+                <a href="{% url 'reservation_list2' restaurant.id %}">
+                  {{ restaurant.reservation_count }}件
                 </a>
+                <a>
+                  <button class="btn btn-secondary" onclick="location.href='{% url 'reservation_management' restaurant.id %}'">枠表示</button>
+                  <br>
+                  <br>
+                  <button class="btn btn-secondary" onclick="location.href='{% url 'reservation_slot_create' restaurant.id %}'">枠作成</button>
+                  </a>
               </td>
-              <td>
+              <td class="text-center">
                 <a href="{% url 'menu_list' restaurant.id %}">
-                  {{ restaurant.menu_count }}件
+                  {{ restaurant.menu_count }}品
                 </a>
               </td>
-              <td>
+              <td class="text-center">
                 <a href="{% url 'dining_table_list' restaurant.id %}">
-                  {{ restaurant.dining_table_count }}台
+                  {{ restaurant.dining_table_count }}卓
                 </a>
               </td>
               <td>
                 <a href="{% url 'review_list2' restaurant.id %}">
-                  未返信{{ restaurant.replies_count }}件／表示中{{ restaurant.review_num }}件
+                  未返信{{ restaurant.replies_count }}件／掲載中{{ restaurant.review_num }}件
                 </a>
               </td>
-
-              <td>
-                <button class="btn btn-primary" onclick="location.href='{% url 'restaurant_update' pk=restaurant.pk %}'">編集</button>
-              </td>
+              {% comment %} <td>
+                <a href="{% url 'reservation_management' restaurant.id %}">予約枠管理
+                </a>
+              </td> {% endcomment %}
             </tr>
             {% endfor %}
           </tbody>

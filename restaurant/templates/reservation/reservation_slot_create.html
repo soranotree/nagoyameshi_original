@@ -1,0 +1,95 @@
+{% extends "layout/base.html" %}
+{% load static %}
+{% load custom_filters %}
+{% block title %}NAGOYAMESHI{% endblock %}
+{% block content %}
+<main>
+  <div class="container nagoyameshi-container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-xxl-6 col-xl-7 col-lg-8 col-md-10">
+        <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+          <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page">予約枠管理</li>
+          </ol>
+        </nav>
+
+        <h1 class="mb-3 text-center">予約枠作成</h1>
+        <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
+        <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br>
+        
+        {% if success_message %}
+        <div class="alert alert-success">{{ success_message }}</div>
+        {% endif %}
+        
+        <form method="post">
+          {% csrf_token %}
+      
+          <div class="form-group">
+              <label for="from_date">適用開始日:</label>
+              <input type="date" id="from_date" name="from_date" required class="form-control d-inline-block w-auto">
+              
+              <label for="to_date">適用終了日:</label>
+              <input type="date" id="to_date" name="to_date" required class="form-control d-inline-block w-auto">
+          </div>
+      
+          <table class="table table-bordered mt-3">
+              <thead>
+                  <tr>
+                      <th>時間</th>
+                      <th>滞在時間 (分)</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  {% for time in time_slots %}
+                  <tr>
+                      <td>{{ time }}</td>
+                      <td>
+                          <input type="number" name="duration_min" value="90" class="form-control d-inline-block w-auto" required>
+                      </td>
+                  </tr>
+                  {% endfor %}
+              </tbody>
+          </table>
+      
+          <div class="form-group mt-3">
+              <label>テーブル選択:</label><br><br>
+              <button type="button" class="btn btn-secondary" id="select-all">全て選択</button>
+              <button type="button" class="btn btn-secondary" id="clear-all">クリアー</button>
+              <br><br>
+              {% for table in tables %}
+                  <div class="form-check form-check-inline">
+                      <input class="form-check-input" type="checkbox" id="table_{{ table.id }}" name="tables" value="{{ table.id }}" checked>
+                      <label class="form-check-label" for="table_{{ table.id }}">{{ table.name_for_internal }}：{{ table.name_for_customer }}</label>
+                  </div>
+              {% endfor %}
+          </div>
+      
+          <button type="submit" class="btn btn-primary mt-3">予約枠を作成する</button>
+      </form>
+      
+      <script>
+          // JavaScript for handling "Select All" and "Clear" functionality
+          document.getElementById('select-all').addEventListener('click', function() {
+              const checkboxes = document.querySelectorAll('input[name="tables"]');
+              checkboxes.forEach((checkbox) => {
+                  checkbox.checked = true; // Check all checkboxes
+              });
+          });
+      
+          document.getElementById('clear-all').addEventListener('click', function() {
+              const checkboxes = document.querySelectorAll('input[name="tables"]');
+              checkboxes.forEach((checkbox) => {
+                  checkbox.checked = false; // Uncheck all checkboxes
+              });
+          });
+      </script>
+
+        <a href="{% url 'reservation_list2' user.id %}">戻る</a>
+    </div>
+  </div>
+
+</div>
+</main>
+{% endblock %}

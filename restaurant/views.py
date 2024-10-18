@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, time
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.db.models import Avg, Sum, Min, Max
@@ -340,6 +340,7 @@ class ReservationCreateView(generic.CreateView):
         restaurant = restaurant,
         date = reservation_date,
         time_start= reservation_time,
+        duration_min__gt= 0,
         dining_table__min_people__lte=number_of_people,  # 最小人数以上
         dining_table__max_people__gte=number_of_people  # 最大人数以下
         )
@@ -388,7 +389,7 @@ class ReservationCreateView(generic.CreateView):
 
     # 予約数の更新
     restaurant = reservation_to_book.restaurant
-    booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True).count()
+    booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False).count()
     restaurant.reservation_num = booked_count
     restaurant.save()
 
@@ -612,7 +613,7 @@ class RestaurantListView2(generic.ListView):
     restaurants = context['object_list']
     for restaurant in restaurants:
       restaurant.dining_table_count = restaurant.diningtable_set.count()
-      restaurant.reservation_count = restaurant.reservation_set.filter(date__gte=today).count()
+      restaurant.reservation_count = restaurant.reservation_set.filter(date__gte=today, is_booked=True, is_dependent = False).count()
       restaurant.menu_count = restaurant.menu_set.count()
       restaurant.replies_count = models.Review.objects.filter(restaurant=restaurant, reply__isnull=True).count()
     return context
@@ -688,22 +689,6 @@ class DiningTableListView(generic.ListView):
             
     return context
 
-# class DiningTableListView(generic.ListView):
-#   template_name = "dining_table/dining_table_list.html"
-#   model = models.DiningTable
-#   # ordering = ['-created_at']
-#   paginate_by = 20
-  
-#   def get_queryset(self):
-#     restaurant_id = self.kwargs.get('restaurant_id')
-#     return models.DiningTable.objects.filter(restaurant_id=restaurant_id)
-
-#   def get_context_data(self, **kwargs):
-#     context = super().get_context_data(**kwargs)
-#     restaurant_id = self.kwargs.get('restaurant_id')
-#     context['restaurant'] = models.Restaurant.objects.get(id=restaurant_id)
-#     return context
-
 """ ダイニングテーブル編集 ================================== """
 class DiningTableUpdateView(generic.UpdateView):
     model = models.DiningTable
@@ -772,25 +757,6 @@ def dining_table_delete(request, restaurant_id, pk):
 
     # Redirect to the list for non-POST requests
     return redirect('dining_table_list', restaurant_id=restaurant_id)
-
-
-# def dining_table_delete(request, restaurant_id, pk):
-#   table = get_object_or_404(models.DiningTable, pk=pk)
-
-#   if request.method == "POST":
-#     try:
-#       table.delete()
-#       # Redirect to the list with success message
-#       query_string = urlencode({'message': 'テーブルを削除しました。', 'type': 'success'})
-#     except ProtectedError:
-#       # Redirect with error message if deletion fails
-#       query_string = urlencode({'message': 'このテーブルは予約があるため削除できません。', 'type': 'error'})
-        
-#     return redirect(f"{redirect('dining_table_list', restaurant_id=restaurant_id).url}?{query_string}")
-
-#   # For non-POST requests, just redirect
-#   return redirect('dining_table_list', restaurant_id=restaurant_id)
-
 
 """ メニュー一覧 ================================== """
 class MenuListView(generic.ListView):
@@ -1023,38 +989,41 @@ def toggle_display_masked(request, pk):
 
     return redirect(reverse('review_list2', kwargs={'pk': review.restaurant.id}))
 
-""" 予約管理 ================================== """
-class ReservationManagementView(generic.ListView):
+""" 予約リスト（店用） ================================== """
+class ReservationListView2(generic.ListView):
     model = models.Reservation
-    template_name = 'reservation/reservation_management.html'
+    template_name = 'reservation/reservation_list2.html'
     context_object_name = 'reservations'
     paginate_by = 10
 
     def get_queryset(self):
         restaurant_id = self.kwargs['restaurant_id']
         restaurant = get_object_or_404(models.Restaurant, id=restaurant_id)
+
+        # Handle 'from_date' parameter, with fallback to today's date.
+        from_date = self.request.GET.get('from_date') or str(now().date())
+        from_date = datetime.strptime(from_date, '%Y-%m-%d').date()
+
+        # Handle 'to_date' parameter, with optional filtering.
+        to_date = self.request.GET.get('to_date')
+        if to_date:
+            to_date = datetime.strptime(to_date, '%Y-%m-%d').date()
+
         queryset = models.Reservation.objects.filter(
             restaurant=restaurant,
             is_booked=True,
-            is_dependent=False
+            is_dependent=False,
+            date__gte=from_date
         ).select_related('menu', 'dining_table')
-
-        # Date range filtering
-        from_date = self.request.GET.get('from_date')
-        to_date = self.request.GET.get('to_date')
-
-        if from_date:
-            queryset = queryset.filter(date__gte=from_date)
 
         if to_date:
             queryset = queryset.filter(date__lte=to_date)
 
-        # Sorting functionality
-        order_by = self.request.GET.get('order_by')
-        if order_by:
-            fields = [field.strip() for field in order_by.split(',')]
-            queryset = queryset.order_by(*fields)
+        order_by = self.request.GET.get('order_by', 'date,time_start')
+        fields = [field.strip() for field in order_by.split(',')]
+        queryset = queryset.order_by(*fields)
 
+        self.total_reservations_count = queryset.count()
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -1062,126 +1031,139 @@ class ReservationManagementView(generic.ListView):
         restaurant_id = self.kwargs['restaurant_id']
         context['restaurant'] = get_object_or_404(models.Restaurant, id=restaurant_id)
 
-        # Get total count of reservations (filtered by the same criteria)
-        total_reservations_count = models.Reservation.objects.filter(
-            restaurant=context['restaurant'],
-            is_booked=True,
-            is_dependent=False
-        ).count()
+        # Ensure dates persist in the context
+        context['from_date'] = self.request.GET.get('from_date') or str(now().date())
+        context['to_date'] = self.request.GET.get('to_date') or ''
 
-        # Apply date range filtering for total count
-        from_date = self.request.GET.get('from_date')
-        to_date = self.request.GET.get('to_date')
-
-        if from_date:
-            total_reservations_count = models.Reservation.objects.filter(
-                restaurant=context['restaurant'],
-                is_booked=True,
-                is_dependent=False,
-                date__gte=from_date
-            ).count()
-
-        if to_date:
-            total_reservations_count = models.Reservation.objects.filter(
-                restaurant=context['restaurant'],
-                is_booked=True,
-                is_dependent=False,
-                date__lte=to_date
-            ).count()
-
-        context['total_reservations_count'] = total_reservations_count
+        context['total_reservations_count'] = self.total_reservations_count
         return context
 
+""" 予約枠管理（店用） ================================== """
+class ReservationManagementView(generic.TemplateView):
+    template_name = 'reservation/reservation_management.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        restaurant_id = self.kwargs['restaurant_id']
+        restaurant = get_object_or_404(models.Restaurant, id=restaurant_id)
 
-# 一度お休み
-# class ReservationManagementView(View):
-#     template_name = 'reservation/reservation_management.html'
+        # Handle date selection from query parameters
+        selected_date_str = self.request.GET.get('date')
+        selected_date = timezone.now().date()
+        if selected_date_str:
+            try:
+                selected_date = timezone.datetime.strptime(selected_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass  # fallback to today's date if parsing fails
 
-#     def get(self, request, restaurant_id):
-#         selected_restaurant = get_object_or_404(models.Restaurant, pk=restaurant_id)
-#         dining_tables = models.DiningTable.objects.filter(restaurant=selected_restaurant)
+        # Handle table selection
+        dining_table_id = self.request.GET.get('dining_table')
+        dining_table = get_object_or_404(models.DiningTable, id=dining_table_id) if dining_table_id else None
 
-#         # Retrieve selected dining table and date
-#         selected_table_id = request.GET.get('dining_table')
-#         selected_table = models.DiningTable.objects.filter(id=selected_table_id).first()
+        # Calculate week start and end
+        week_start = selected_date - timedelta(days=selected_date.weekday())
+        week_end = week_start + timedelta(days=6)
 
-#         selected_date_str = request.GET.get('selected_date')
-#         selected_date = (
-#             datetime.strptime(selected_date_str, "%Y-%m-%d").date()
-#             if selected_date_str else now().date()
-#         )
+        # Get reservations for the selected week and table
+        reservations = models.Reservation.objects.filter(
+            restaurant=restaurant,
+            dining_table=dining_table,
+            date__range=[week_start, week_end]
+        ).select_related('menu', 'dining_table')
 
-#         # Calculate start and end of the selected week
-#         start_of_week = selected_date - timedelta(days=selected_date.weekday())
-#         end_of_week = start_of_week + timedelta(days=6)
+        # Generate 30-minute time slots from 9:00 to 22:30
+        time_slots = [timezone.datetime.combine(selected_date, timezone.datetime.min.time()) + timedelta(hours=9) + timedelta(minutes=30 * i) for i in range(28)]
 
-#         # Calculate previous, current, and next week dates
-#         previous_week_date = start_of_week - timedelta(days=7)
-#         next_week_date = start_of_week + timedelta(days=7)
-#         current_week_date = now().date()
+        # Provide context data
+        context['restaurant'] = restaurant
+        context['selected_date'] = selected_date
+        context['dining_table'] = dining_table
+        context['week_dates'] = [week_start + timedelta(days=i) for i in range(7)]
+        context['time_slots'] = [slot.time() for slot in time_slots]
+        context['reservations'] = reservations
+        context['tables'] = models.DiningTable.objects.filter(restaurant=restaurant)
 
-#         time_slots = [
-#           ("09:00", "9:00 AM"), 
-#           ("09:30", "9:30 AM"), 
-#           ("10:00", "10:00 AM"), 
-#           ("10:30", "10:30 AM"), 
-#           ("11:00", "11:00 AM"), 
-#           ("11:30", "11:30 AM"), 
-#           ("12:00", "12:00 PM"), 
-#           ("12:30", "12:30 PM"),
-#           ("13:00", "1:00 PM"), 
-#           ("13:30", "1:30 PM"),
-#           ("14:00", "2:00 PM"), 
-#           ("14:30", "2:30 PM"),
-#           ("15:00", "3:00 PM"), 
-#           ("15:30", "3:30 PM"),
-#           ("16:00", "4:00 PM"), 
-#           ("16:30", "4:30 PM"),
-#           ("17:00", "5:00 PM"), 
-#           ("17:30", "5:30 PM"),
-#           ("18:00", "6:00 PM"), 
-#           ("18:30", "6:30 PM"),
-#           ("19:00", "7:00 PM"), 
-#           ("19:30", "7:30 PM"),
-#           ("20:00", "8:00 PM"), 
-#           ("20:30", "8:30 PM"),
-#           ("21:00", "9:00 PM"), 
-#           ("21:30", "9:30 PM"),
-#           ("22:00", "10:00 PM"), 
-#           ("22:30", "10:30 PM"),
-#           ]
-#         # Prepare reservation data
-#         reservation_data = {
-#             date: {slot[0]: None for slot in time_slots}
-#             for date in (start_of_week + timedelta(days=i) for i in range(7))
-#         }
+        # Calculate previous and next weeks' dates for easy access
+        context['prev_week'] = (selected_date - timedelta(weeks=1)).strftime('%Y-%m-%d')
+        context['this_week'] = timezone.now().date().strftime('%Y-%m-%d')
+        context['next_week'] = (selected_date + timedelta(weeks=1)).strftime('%Y-%m-%d')
 
-#         if selected_table:
-#             reservations = models.Reservation.objects.filter(
-#                 dining_table=selected_table,
-#                 date__range=[start_of_week, end_of_week]
-#             )
-#             for res in reservations:
-#                 reservation_data[res.date][res.time_start] = res
+        return context
 
-#         print("Reservation Data:", reservation_data)  # Check the structure and contents
+""" 予約枠作成（店用） ================================== """
+class ReservationSlotCreateView(View):
+    template_name = 'reservation/reservation_slot_create.html'
 
-#         context = {
-#             'selected_restaurant': selected_restaurant,
-#             'dining_tables': dining_tables,
-#             'selected_table': selected_table,
-#             'selected_date': selected_date,
-#             'reservation_data': reservation_data,
-#             'start_of_week': start_of_week,
-#             'end_of_week': end_of_week,
-#             'previous_week_date': previous_week_date,
-#             'next_week_date': next_week_date,
-#             'current_week_date': current_week_date,
-#             'time_slots': time_slots,
-#         }
-#         return render(request, self.template_name, context)
+    def get_context_data(self, **kwargs):
+        """Provide context for the form with restaurant and table details."""
+        restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['restaurant_id'])
+        tables = models.DiningTable.objects.filter(restaurant=restaurant)
 
-#     def post(self, request):
-#         # Handle any form submissions if needed
-#         return redirect('reservation_management')
+        # Generate 30-minute time slots from 9:00 to 22:30
+        start_time = timezone.datetime.combine(timezone.now(), timezone.datetime.min.time()) + timedelta(hours=9)
+        time_slots = [(start_time + timedelta(minutes=30 * i)).time() for i in range(28)]
+
+        return {'restaurant': restaurant, 'tables': tables, 'time_slots': time_slots}
+
+    def get(self, request, *args, **kwargs):
+        """Render the template with the form to create reservation slots."""
+        context = self.get_context_data(**kwargs)
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        """Handle slot creation for selected tables and date range."""
+        restaurant = get_object_or_404(models.Restaurant, id=kwargs['restaurant_id'])
+        
+        # Retrieve the date range and table selections from the form
+        selected_start_date = request.POST.get('from_date')
+        selected_end_date = request.POST.get('to_date')
+        selected_tables = request.POST.getlist('tables')
+        duration_mins = request.POST.getlist('duration_min')  # Retrieve as a list
+
+        # Convert selected dates to datetime.date objects
+        start_date = timezone.datetime.fromisoformat(selected_start_date).date()
+        end_date = timezone.datetime.fromisoformat(selected_end_date).date()
+
+        # Debugging: Print values to ensure they're retrieved correctly
+        print("Selected Start Date:", selected_start_date)
+        print("Selected End Date:", selected_end_date)
+        print("Selected Tables:", selected_tables)
+        print("Durations (minutes):", duration_mins)
+
+        created_slots_count = 0
+
+        # Iterate through each date in the selected range
+        current_date = start_date
+        while current_date <= end_date:
+            # Iterate through selected tables to create time slots for the current date
+            for table_id in selected_tables:
+                table = get_object_or_404(models.DiningTable, id=table_id)
+                start_time = timezone.datetime.combine(current_date, timezone.datetime.min.time()) + timedelta(hours=9)
+
+                for i in range(len(duration_mins)):  # Loop through each duration
+                    slot_time = start_time + timedelta(minutes=30 * i)
+
+                    # Check for existing reservations to avoid duplicates
+                    if not models.Reservation.objects.filter(
+                        restaurant=restaurant,
+                        dining_table=table,
+                        date=current_date,
+                        time_start=slot_time
+                    ).exists():
+                        models.Reservation.objects.create(
+                            restaurant=restaurant,
+                            dining_table=table,
+                            date=current_date,
+                            time_start=slot_time,
+                            duration_min=int(duration_mins[i]),  # Use the corresponding duration
+                        )
+                        created_slots_count += 1
+                    else:
+                        print(f"Slot already exists for {table.name_for_customer} at {slot_time} on {current_date}")  # Debug
+
+            # Move to the next date
+            current_date += timedelta(days=1)
+
+        # Provide user feedback on the number of created slots
+        messages.success(request, f"{created_slots_count}件の予約枠が作成されました。")
+        return redirect('reservation_management', restaurant_id=restaurant.id)

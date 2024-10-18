@@ -2,22 +2,49 @@ from django import forms
 from .models import Reservation, Review, Restaurant, DiningTable, Menu
 
 class ReservationCreateForm(forms.ModelForm):
-  class Meta:
-    model = Reservation
-    fields = ('date', 'time_start', 'number_of_people', 'dining_table',)
+    duration_min = forms.ChoiceField(
+        choices=[(30, '30分'), (60, '60分'), (90, '90分'), (120, '120分'), (150, '150分'), (180, '180分')],
+        label='滞在時間',
+        initial=90,
+    )
+
+    class Meta:
+        model = Reservation
+        fields = ('date', 'time_start', 'number_of_people', 'dining_table', 'duration_min')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date'].widget.attrs['class'] = 'form-control'
+        self.fields['date'].widget.attrs['id'] = 'reservation_date'
+        self.fields['date'].widget.attrs['name'] = 'reservation_date'
+        # Reservation.TIMES を使用して time_start に選択肢を設定
+        self.fields['time_start'].widget = forms.Select(
+            choices=Reservation.TIMES
+        )
+        self.fields['time_start'].widget.attrs['class'] = 'form-control'
+        self.fields['number_of_people'].widget.attrs['class'] = 'form-control'
+        self.fields['dining_table'].widget.attrs['class'] = 'form-control'
+        self.fields['duration_min'].widget.attrs['class'] = 'form-control'
+        # self.fields['restaurant'].widget.attrs['class'] = 'form-control'
+
+# 店側と共用することになったため以下コメントアウト中
+# class ReservationCreateForm(forms.ModelForm):
+#   class Meta:
+#     model = Reservation
+#     fields = ('date', 'time_start', 'number_of_people', 'dining_table',)
   
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.fields['date'].widget.attrs['class'] = 'form-control'
-    self.fields['date'].widget.attrs['id'] = 'reservation_date'
-    self.fields['date'].widget.attrs['name'] = 'reservation_date'
-    # Reservation.TIMES を使用して time_start に選択肢を設定
-    self.fields['time_start'].widget = forms.Select(
-      choices=Reservation.TIMES
-      )
-    self.fields['time_start'].widget.attrs['class'] = 'form-control'
-    self.fields['number_of_people'].widget.attrs['class'] = 'form-control'
-    self.fields['dining_table'].widget.attrs['class'] = 'form-control'
+#   def __init__(self, *args, **kwargs):
+#     super().__init__(*args, **kwargs)
+#     self.fields['date'].widget.attrs['class'] = 'form-control'
+#     self.fields['date'].widget.attrs['id'] = 'reservation_date'
+#     self.fields['date'].widget.attrs['name'] = 'reservation_date'
+#     # Reservation.TIMES を使用して time_start に選択肢を設定
+#     self.fields['time_start'].widget = forms.Select(
+#       choices=Reservation.TIMES
+#       )
+#     self.fields['time_start'].widget.attrs['class'] = 'form-control'
+#     self.fields['number_of_people'].widget.attrs['class'] = 'form-control'
+#     self.fields['dining_table'].widget.attrs['class'] = 'form-control'
 
 class ReviewCreateForm(forms.ModelForm):
   class Meta:
@@ -132,3 +159,4 @@ class MenuCreateForm(forms.ModelForm):
                 'placeholder': '例：21:30',  # Optional placeholder text
             }
         )
+
