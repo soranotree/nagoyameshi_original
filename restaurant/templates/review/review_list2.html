@@ -53,7 +53,7 @@
                 {{ review.display_masked|yesno:"非表示,表示" }}
               </td>
               <td>
-                <a href="{% url 'review_update2' review.pk %}" class="btn btn-sm btn-primary">返信
+                <a href="{% url 'review_update2' restaurant.id review.pk %}" class="btn btn-sm btn-primary">返信
                 </a>
                 <form method="post" action="{% url 'toggle_display_masked' review.pk %}" style="display:inline;">
                   {% csrf_token %}

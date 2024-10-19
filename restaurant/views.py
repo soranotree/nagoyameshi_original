@@ -361,8 +361,8 @@ class ReservationCreateView(generic.CreateView):
                     dining_table=slot.dining_table,  # 同じテーブル
                     date=reservation_date,
                     is_booked=True,
-                    time_start__lte=slot_end_time,  # 終了時間前に始まる
-                    time_start__gte=slot.time_start,  # スロットの開始時間以降
+                    time_start__lt=slot_end_time,  # 終了時間前に始まる
+                    time_start__gt=slot.time_start,  # スロットの開始時間以降
                 )
 
                 if not conflicting_reservations.exists():
@@ -378,7 +378,7 @@ class ReservationCreateView(generic.CreateView):
                 restaurant=restaurant,
                 available_from__lte=reservation_time_obj,
                 available_end__gte=reservation_time_obj,
-            )
+            ).order_by('price')
             context['menus'] = menus  # コンテキストに追加
 
         # 検索窓のデフォルト値設定＆直前検索データ維持用
@@ -408,6 +408,29 @@ class ReservationCreateView(generic.CreateView):
         reservation_to_book.save()
         # reservation_numの更新
 
+        # 予約の終了時間を計算
+        end_time = (
+            datetime.combine(datetime.today(), reservation_to_book.time_start) +
+            timedelta(minutes=reservation_to_book.duration_min)
+            ).time()
+
+        # 依存スロット（予約終了時間よりも手前のスロット）を取得
+        dependent_reservations = models.Reservation.objects.filter(
+            dining_table=reservation_to_book.dining_table,
+            is_booked=False,
+            is_dependent=False,
+            date=reservation_to_book.date,
+            time_start__gt=reservation_to_book.time_start,  # 現在の予約の開始時間以降
+            time_start__lt=end_time,  # 終了時間よりも早い
+            )
+
+        # 取得した予約に対して、is_booked=True and is_dependent=Trueを設定
+        for dep_reservation in dependent_reservations:
+            dep_reservation.is_booked = True
+            dep_reservation.is_dependent = True
+            dep_reservation.customer = user_instance
+            dep_reservation.save()
+
         # 予約数の更新
         restaurant = reservation_to_book.restaurant
         booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False).count()
@@ -427,7 +450,8 @@ class ReservationListView(generic.ListView):
   def get_queryset(self):
     queryset = models.Reservation.objects.filter(
       customer_id=self.request.user.id,
-      is_booked = True
+      is_booked = True,
+      is_dependent = False
       ).order_by('-date')
     return queryset
   
@@ -438,33 +462,69 @@ class ReservationListView(generic.ListView):
 
 """ 予約の削除 ================================== """
 def reservation_delete(request):
-  pk = request.GET.get('pk')
-  is_success = True
-  # レコード削除ではなくis_booked=Falseとcostomer = Noneとし、使いまわす
-  if pk:
-    try:
-      # 該当する予約レコードを取得
-      reservation = models.Reservation.objects.get(id=pk)
-      # レコードを削除する代わりに、is_booked, customer, number_of_peopleを元に戻す
-      reservation.is_booked = False
-      reservation.customer = None  # customer_idをnullにする
-      reservation.number_of_people = None  # number_of_peopleをnullにする
-      reservation.menu = None  # menuをnullにする
-      reservation.save()
-      # 予約数の更新
-      restaurant = reservation.restaurant
-      booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True).count()
-      restaurant.reservation_num = booked_count
-      restaurant.save()
+    pk = request.GET.get('pk')
+    is_success = True
 
-    except models.Reservation.DoesNotExist:
-      is_success = False
-    except Exception as e:
-      is_success = False
-  else:
-    is_success = False
-  
-  return JsonResponse({'is_success': is_success})
+    if pk:
+        try:
+            # 該当する予約レコードを取得
+            reservation = models.Reservation.objects.get(id=pk)
+
+            # 予約と依存する予約をリセットする関数
+            def reset_reservation(res):
+                res.is_booked = False
+                res.is_dependent = False  # 依存フラグもリセット
+                res.customer = None  # customer_idをnullにする
+                res.number_of_people = None  # number_of_peopleをnullにする
+                res.menu = None  # menuをnullにする
+                res.save()
+
+            # 現在の予約をリセット
+            reset_reservation(reservation)
+
+            # 現在の予約の終了時間を計算（datetimeに変換して処理）
+            current_datetime = datetime.combine(reservation.date, reservation.time_start)
+            next_time = current_datetime + timedelta(minutes=30)
+
+            dependent_slots = []
+
+            # 依存する連続スロットを取得（逐次探索）
+            while True:
+                next_reservation = models.Reservation.objects.filter(
+                    dining_table=reservation.dining_table,
+                    date=next_time.date(),  # 同じ日付
+                    time_start=next_time.time(),  # 次の30分後のスロット
+                    is_dependent=True,
+                    is_booked=True  # 予約されている依存スロットのみ
+                ).first()
+
+                if next_reservation:
+                    dependent_slots.append(next_reservation)
+                    next_time += timedelta(minutes=30)  # 次のスロットの探索
+                else:
+                    break  # 連続スロットの探索終了
+
+            # 取得した依存スロットをリセット
+            for dep_res in dependent_slots:
+                reset_reservation(dep_res)
+
+            # 予約数の更新
+            restaurant = reservation.restaurant
+            booked_count = models.Reservation.objects.filter(
+                restaurant=restaurant, is_booked=True, is_dependent=False
+            ).count()
+            restaurant.reservation_num = booked_count
+            restaurant.save()
+
+        except models.Reservation.DoesNotExist:
+            is_success = False
+        except Exception as e:
+            print(f"Error: {e}")  # Debugging: エラーを表示
+            is_success = False
+    else:
+        is_success = False
+
+    return JsonResponse({'is_success': is_success})
   
 """ レビューの一覧表示 ================================== """
 class ReviewListView(generic.ListView):
@@ -987,9 +1047,15 @@ class ReviewUpdateView2(generic.UpdateView):
     fields = ['reply']
     template_name = "review/review_update2.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add restaurant to the context
+        context['restaurant'] = self.object.restaurant
+        return context
+
     def get_success_url(self):
         restaurant_id = self.object.restaurant.id
-        return reverse_lazy('review_list2', kwargs={'pk': restaurant_id})
+        return reverse_lazy('review_list_2', kwargs={'pk': restaurant_id})
 
 """ 誹謗中傷レビューの非表示対応 ================================== """
 def toggle_display_masked(request, pk):
@@ -1008,7 +1074,7 @@ def toggle_display_masked(request, pk):
       restaurant.rate = None
     restaurant.save()
 
-    return redirect(reverse('review_list2', kwargs={'pk': review.restaurant.id}))
+    return redirect(reverse('review_list_2', kwargs={'pk': review.restaurant.id}))
 
 """ 予約リスト（店用） ================================== """
 class ReservationListView2(generic.ListView):
@@ -1165,12 +1231,23 @@ class ReservationSlotCreateView(View):
                     slot_time = start_time + timedelta(minutes=30 * i)
 
                     # Check for existing reservations to avoid duplicates
-                    if not models.Reservation.objects.filter(
+                    reservation = models.Reservation.objects.filter(
                         restaurant=restaurant,
                         dining_table=table,
                         date=current_date,
                         time_start=slot_time
-                    ).exists():
+                        ).first()
+                    
+                    # 枠が存在している場合、予約なしならduration_minを上書き、予約ありなら変更せず
+                    if reservation:
+                        if not reservation.is_booked:
+                          reservation.duration_min = int(duration_mins[i])
+                          reservation.save()
+                          print(f"Updated duration for {table.name_for_customer} at {slot_time} on {current_date}")
+                        else:
+                          print(f"Slot is already booked for {table.name_for_customer} at {slot_time} on {current_date}")
+                    # 枠がなければ予約枠を作成
+                    else:
                         models.Reservation.objects.create(
                             restaurant=restaurant,
                             dining_table=table,
@@ -1179,8 +1256,6 @@ class ReservationSlotCreateView(View):
                             duration_min=int(duration_mins[i]),  # Use the corresponding duration
                         )
                         created_slots_count += 1
-                    else:
-                        print(f"Slot already exists for {table.name_for_customer} at {slot_time} on {current_date}")  # Debug
 
             # Move to the next date
             current_date += timedelta(days=1)

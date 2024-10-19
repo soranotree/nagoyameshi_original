@@ -9,20 +9,41 @@
         <nav class="my-3" style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
           <ol class="breadcrumb mb-0">
             <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'restaurant_list_2' user.id %}">保有店舗一覧</a></li>
-            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'review_list2' restaurant.id %}">レビュー一覧</a></li>
+            <li class="breadcrumb-item active" aria-current="page"><a href="{% url 'review_list_2' restaurant.id %}">レビュー一覧</a></li>
+          </li>
+
             <li class="breadcrumb-item active" aria-current="page">レビュー返信</li>
           </ol>
         </nav>
         <h1 class="mb-3 text-center">レビューの返信</h1>
         <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
-        <a href="{% url 'review_list2' restaurant.id %}">戻る</a>
+        <a href="{% url 'review_list_2' restaurant.id %}">戻る</a>
         <br><br>
+        <style>
+          .comment-box {
+              border: 1px solid #ccc;
+              padding: 15px;
+              border-radius: 5px;
+              background-color: #f9f9f9;
+              margin-bottom: 15px;
+          }
+  
+        </style>
+  
+        <div class="card-body">
+          <p>お客様からのコメント</p>
+          <div class="comment-box">
+            訪問日：{{ review.visit_date }}<br>
+            投稿日：{{ review.created_at }}<br>
+            コメント：<br>{{ review.comment }}
+          </div>
+        </div>
         <div class="card-body">
           <form method="post">
             {% csrf_token %}
             {{ form.as_p }}
             <button type="submit" class="btn btn-primary">更新</button>
-            <a href="{% url 'review_list2' object.restaurant.id %}" class="btn btn-secondary">キャンセル</a>
+            <a href="{% url 'review_list_2' object.restaurant.id %}" class="btn btn-secondary">キャンセル</a>
           </form>
         </div>
       </div>

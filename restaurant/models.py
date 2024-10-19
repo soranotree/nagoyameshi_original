@@ -69,7 +69,7 @@ class Menu(models.Model):
   restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE) # レストランとの紐づけ
   name = models.CharField(verbose_name='メニュー名', max_length=100) # メニュー名
   description = models.TextField(verbose_name='メニュー説明') # メニューの説明
-  price = models.IntegerField(verbose_name='価格（一名分）')  # 単価（整数値）
+  price = models.IntegerField(verbose_name='価格（一名分）', blank=True, null=True)  # 単価（整数値）
   available_from = models.TimeField(verbose_name='提供開始時間') # 提供開始時間
   available_end = models.TimeField(verbose_name='提供終了時間') # 提供終了時間
   photo = models.ImageField(verbose_name='写真', blank=True, null=True) # メニュー写真
