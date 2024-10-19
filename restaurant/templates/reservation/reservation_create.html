@@ -136,18 +136,18 @@
                       <th>　　　</th>
                       <th style="text-align: center;">選択</th>
                   </tr>
-                  <tr>
-                      <td>席のみ</td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                      <th style="text-align: center;">－</td>
-                      <td></td>
-                      <th style="text-align: center; font-weight: normal;">
-                          <input type="radio" name="menu" value="NULL" id="no_menu" checked>
-                          <label for="no_menu">選択</label>
-                      </td>
-                  </tr>
+                  {% comment %} <tr> {% endcomment %}
+                      {% comment %} <td>席のみ</td> {% endcomment %}
+                      {% comment %} <td></td> {% endcomment %}
+                      {% comment %} <td></td> {% endcomment %}
+                      {% comment %} <td></td> {% endcomment %}
+                      {% comment %} <th style="text-align: center;">－</td> {% endcomment %}
+                      {% comment %} <td></td> {% endcomment %}
+                      {% comment %} <th style="text-align: center; font-weight: normal;"> {% endcomment %}
+                          {% comment %} <input type="radio" name="menu" value="NULL" id="no_menu" checked> {% endcomment %}
+                          {% comment %} <label for="no_menu">選択</label> {% endcomment %}
+                      {% comment %} </td> {% endcomment %}
+                  {% comment %} </tr> {% endcomment %}
                   {% for menu in menus %}
                   <tr>
                       <td>{{ menu.name }}</td>

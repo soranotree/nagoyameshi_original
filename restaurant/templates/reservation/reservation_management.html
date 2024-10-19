@@ -47,6 +47,11 @@
         <h2 class="mb-3 text-center">【{{ restaurant.shop_name }}】</h2>
         <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
         <br>
+        <a href="{% url 'reservation_slot_create' restaurant.id %}">予約枠を作成する</a>
+
+        
+        <br>
+        <br>
 
         <form method="get" class="mb-3 ">
           <label for="date">日付選択:</label>
@@ -130,6 +135,8 @@
       
       
         <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
+        <br>
+        <a href="{% url 'reservation_slot_create' restaurant.id %}">予約枠を作成する</a>
       </div>
     </div>
   </div>

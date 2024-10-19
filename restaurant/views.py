@@ -306,96 +306,117 @@ def favorite_delete(request):
 
 """ 新規予約登録画面 ================================== """
 class ReservationCreateView(generic.CreateView):
-  template_name = "reservation/reservation_create.html"
-  model = models.Reservation
-  fields = []  # フォームは後で動的に生成します
-  # ガイドからの改修によりコメントアウト、フォームなしで実装にトライ
-  # form_class = forms.ReservationCreateForm
-  success_url = reverse_lazy('reservation_list')
-  
-  def get(self, request, **kwargs):
-    user = request.user
-    if user.is_authenticated and user.is_subscribed:
-      return super().get(request, **kwargs)
-    if not user.is_authenticated:
-      return redirect(reverse_lazy('account_login'))
-    if not user.is_subscribed:
-      return redirect(reverse_lazy('subscribe_register'))
-  
-  def get_context_data(self, **kwargs):
-    context = super().get_context_data(**kwargs)
-    restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['pk'])
-    context['restaurant'] = restaurant
-    context['hours'] = range(9, 23) # 予約時間リスト作成
+    template_name = "reservation/reservation_create.html"
+    model = models.Reservation
+    fields = []  # フォームは後で動的に生成します
+    # ガイドからの改修によりコメントアウト、フォームなしで実装にトライ
+    # form_class = forms.ReservationCreateForm
+    success_url = reverse_lazy('reservation_list')
 
-    # 予約条件を取得
-    reservation_date = self.request.GET.get('date')  # フロントからの取得
-    reservation_time = self.request.GET.get('time')  # フロントからの取得
-    number_of_people = self.request.GET.get('number_of_people')  # フロントからの取得
-    
-    # 予約可能なスロットを取得
-    if reservation_date and reservation_time and number_of_people:
-      self.available_slots = models.Reservation.objects.filter(
-        is_booked = False,
-        restaurant = restaurant,
-        date = reservation_date,
-        time_start= reservation_time,
-        duration_min__gt= 0,
-        dining_table__min_people__lte=number_of_people,  # 最小人数以上
-        dining_table__max_people__gte=number_of_people  # 最大人数以下
-        )
-      context['available_slots'] = self.available_slots # コンテキストに追加
-      context['reservation_date'] = reservation_date # コンテキストに追加
-      context['reservation_time'] = reservation_time # コンテキストに追加
-      context['number_of_people'] = number_of_people # コンテキストに追加
-      
-    # 予約時間帯で提供可能なメニューを取得
-      menus = models.Menu.objects.filter(
-        restaurant = restaurant,
-        available_from__lte=reservation_time, 
-        available_end__gte=reservation_time
-        )
-      context['menus'] = menus # コンテキストに追加
-    
-    # 検索窓のデフォルト値設定＆直前検索データ維持用
-    today = datetime.now().date()
-    tomorrow = today + timedelta(days=1)
-    context['tomorrow'] = tomorrow.strftime('%Y-%m-%d')
-    context['people_range'] = range(1, 13)  # 1人から(n-1)人までのリストを作成
-    context['default_time'] = reservation_time if reservation_time else f"{context['hours'].start}:00"
-    
-    return context
-  
-  def form_valid(self, form):
-    # POSTデータから予約する予約レコードのIDを取得
-    reservation_id = self.request.POST.get('reservation_id')
+    def get(self, request, **kwargs):
+        user = request.user
+        if user.is_authenticated and user.is_subscribed:
+            return super().get(request, **kwargs)
+        if not user.is_authenticated:
+            return redirect(reverse_lazy('account_login'))
+        if not user.is_subscribed:
+            return redirect(reverse_lazy('subscribe_register'))
 
-    # その予約レコードを取得
-    reservation_to_book = get_object_or_404(models.Reservation, id=reservation_id)
-    # ログインしているユーザーを取得
-    user_instance = self.request.user
-    # 予約レコードの更新
-    reservation_to_book.is_booked = True  # 予約済みにする
-    reservation_to_book.customer = user_instance  # 予約ユーザー
-    reservation_to_book.number_of_people = self.request.POST.get('number_of_people')  # 予約人数
-    # 予約メニュー
-    menu_id = self.request.POST.get('menu')  # 予約メニュー
-    if menu_id == 'NULL':
-      reservation_to_book.menu = None
-    else:
-      reservation_to_book.menu = models.Menu.objects.get(id=int(menu_id))
-    reservation_to_book.save()
-    # reservation_numの更新
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        restaurant = get_object_or_404(models.Restaurant, id=self.kwargs['pk'])
+        context['restaurant'] = restaurant
+        context['hours'] = range(9, 23)  # 予約時間リスト作成
 
-    # 予約数の更新
-    restaurant = reservation_to_book.restaurant
-    booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False).count()
-    restaurant.reservation_num = booked_count
-    restaurant.save()
+        # 予約条件を取得
+        reservation_date = self.request.GET.get('date')  # フロントからの取得
+        reservation_time = self.request.GET.get('time')  # フロントからの取得
+        number_of_people = self.request.GET.get('number_of_people')  # フロントからの取得
 
-    messages.success(self.request, "予約が完了しました。")
+        # 予約可能なスロットを取得
+        if reservation_date and reservation_time and number_of_people:
+            reservation_time_obj = datetime.strptime(reservation_time, "%H:%M").time()
 
-    return redirect(self.success_url)      
+            # 同じテーブルの予約が持つ予約時間を確認
+            potential_slots = models.Reservation.objects.filter(
+                is_booked=False,
+                restaurant=restaurant,
+                date=reservation_date,
+                time_start= reservation_time,
+                duration_min__gt= 0,
+                dining_table__min_people__lte=number_of_people,
+                dining_table__max_people__gte=number_of_people,
+            )
+
+            valid_slots = []
+            for slot in potential_slots:
+                # 現在のスロットの終了時間を計算
+                slot_end_time = (
+                    datetime.combine(datetime.today(), slot.time_start) +
+                    timedelta(minutes=slot.duration_min)
+                ).time()
+
+                # 同じテーブルで重複する予約があるか確認
+                conflicting_reservations = models.Reservation.objects.filter(
+                    dining_table=slot.dining_table,  # 同じテーブル
+                    date=reservation_date,
+                    is_booked=True,
+                    time_start__lte=slot_end_time,  # 終了時間前に始まる
+                    time_start__gte=slot.time_start,  # スロットの開始時間以降
+                )
+
+                if not conflicting_reservations.exists():
+                    valid_slots.append(slot)
+
+            context['available_slots'] = valid_slots  # コンテキストに追加
+            context['reservation_date'] = reservation_date  # コンテキストに追加
+            context['reservation_time'] = reservation_time  # コンテキストに追加
+            context['number_of_people'] = number_of_people  # コンテキストに追加
+
+            # 提供可能なメニューの取得
+            menus = models.Menu.objects.filter(
+                restaurant=restaurant,
+                available_from__lte=reservation_time_obj,
+                available_end__gte=reservation_time_obj,
+            )
+            context['menus'] = menus  # コンテキストに追加
+
+        # 検索窓のデフォルト値設定＆直前検索データ維持用
+        today = datetime.now().date()
+        tomorrow = today + timedelta(days=1)
+        context['tomorrow'] = tomorrow.strftime('%Y-%m-%d')
+        context['people_range'] = range(1, 13)  # 1人から12人までのリストを作成
+        context['default_time'] = reservation_time if reservation_time else f"{context['hours'].start}:00"
+
+        return context
+
+    def form_valid(self, form):
+        # POSTデータから予約する予約レコードのIDを取得
+        reservation_id = self.request.POST.get('reservation_id')
+
+        # その予約レコードを取得
+        reservation_to_book = get_object_or_404(models.Reservation, id=reservation_id)
+        # ログインしているユーザーを取得
+        user_instance = self.request.user
+        # 予約レコードの更新
+        reservation_to_book.is_booked = True  # 予約済みにする
+        reservation_to_book.customer = user_instance  # 予約ユーザー
+        reservation_to_book.number_of_people = self.request.POST.get('number_of_people')  # 予約人数
+        # 予約メニュー
+        menu_id = self.request.POST.get('menu')  # 予約メニュー
+        reservation_to_book.menu = models.Menu.objects.filter(id=menu_id).first()
+        reservation_to_book.save()
+        # reservation_numの更新
+
+        # 予約数の更新
+        restaurant = reservation_to_book.restaurant
+        booked_count = models.Reservation.objects.filter(restaurant=restaurant, is_booked=True, is_dependent=False).count()
+        restaurant.reservation_num = booked_count
+        restaurant.save()
+
+        messages.success(self.request, "予約が完了しました。")
+
+        return redirect(self.success_url) 
   
 """ 予約一覧表示画面 ================================== """
 class ReservationListView(generic.ListView):

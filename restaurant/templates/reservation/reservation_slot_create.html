@@ -52,9 +52,10 @@
                   {% endfor %}
               </tbody>
           </table>
-      
+          <br>
+
           <div class="form-group mt-3">
-              <label>テーブル選択:</label><br><br>
+              <label><h2 class="mb-3 text-center">テーブル選択:</h2></label><br>
               <button type="button" class="btn btn-secondary" id="select-all">全て選択</button>
               <button type="button" class="btn btn-secondary" id="clear-all">クリアー</button>
               <br><br>
@@ -86,7 +87,7 @@
           });
       </script>
 
-        <a href="{% url 'reservation_list2' user.id %}">戻る</a>
+      <a href="{% url 'restaurant_list_2' user.id %}">戻る</a>
     </div>
   </div>
 

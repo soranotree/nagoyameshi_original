@@ -27,7 +27,9 @@ SECRET_KEY = "django-insecure-ofmelqfjp5!@v!28-$#)&m0t(hmz5qgep6g(j3%h#z5@q4_b$3
 if os.path.exists("./.is_debug"):
     DEBUG = True
 else:
-    DEBUG = False
+    DEBUG = True
+    # Herokuチェックのため退避
+    # DEBUG = False
 
 ALLOWED_HOSTS = ["127.0.0.1", ".herokuapp.com"]
 

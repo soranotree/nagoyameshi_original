@@ -51,7 +51,7 @@
                   {{ restaurant.reservation_count }}件
                 </a>
                 <a>
-                  <button class="btn btn-secondary" onclick="location.href='{% url 'reservation_management' restaurant.id %}'">枠表示</button>
+                  <button class="btn btn-secondary" onclick="location.href='{% url 'reservation_management' restaurant.id %}'">枠詳細</button>
                   <br>
                   <br>
                   <button class="btn btn-secondary" onclick="location.href='{% url 'reservation_slot_create' restaurant.id %}'">枠作成</button>
